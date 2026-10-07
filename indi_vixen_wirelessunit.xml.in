@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (C) 2026 Satoshi Masuko <wakeup1002@gmail.com> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<driversList>
+    <devGroup group="Telescopes">
+        <device label="Vixen Wireless Unit" manufacturer="Vixen">
+            <driver name="Vixen Wireless Unit">indi_vixen_wirelessunit</driver>
+            <version>@PROJECT_VERSION@</version>
+        </device>
+    </devGroup>
+</driversList>

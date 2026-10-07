@@ -1,0 +1,82 @@
+indi-vixen-wirelessunit (0.1.136-1) trixie; urgency=medium
+
+  * Add opt-in automatic HOME initialization for an uninitialized mount.
+  * Preserve manual recovery when automatic HOME initialization fails.
+  * Shorten long INDI property labels for narrow KStars panels.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Thu, 24 Sep 2026 14:00:00 +0900
+
+indi-vixen-wirelessunit (0.1.135-1) trixie; urgency=medium
+
+  * Retry automatic UDP discovery up to four times at five-second intervals.
+  * Keep the INDI event loop responsive while waiting between attempts.
+  * Cancel pending discovery on Disconnect, endpoint changes, or Simulation
+    changes, and reject duplicate automatic Connect sequences.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Thu, 24 Sep 2026 13:00:00 +0900
+
+indi-vixen-wirelessunit (0.1.134-1) trixie; urgency=medium
+
+  * Retry UDP discovery on a later Connect after an earlier automatic search
+    found no usable Wireless Unit.
+  * Preserve successful discovery results and manually selected endpoints.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Thu, 24 Sep 2026 12:00:00 +0900
+
+indi-vixen-wirelessunit (0.1.133-1) trixie; urgency=medium
+
+  * Classify Vixen Wireless Unit under the Vixen manufacturer in KStars.
+  * Verify the manufacturer attribute in release metadata tests.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Wed, 23 Sep 2026 16:45:11 +0900
+
+indi-vixen-wirelessunit (0.1.132-1) trixie; urgency=medium
+
+  * Update the copyright and package contact address.
+  * Synchronize the protocol evidence ledger with the current UDP defaults
+    and discovery implementation, while redacting the observed location.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Wed, 23 Sep 2026 00:33:01 +0900
+
+indi-vixen-wirelessunit (0.1.131-1) trixie; urgency=medium
+
+  * Install a manual page for indi_vixen_wirelessunit.
+  * Give the latest changelog entry a date newer than the preceding release.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Tue, 22 Sep 2026 22:19:08 +0900
+
+indi-vixen-wirelessunit (0.1.130-1) trixie; urgency=medium
+
+  * Validate release metadata in both the repository and staged
+    indi-3rdparty Debian directory layouts.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Tue, 22 Sep 2026 21:55:00 +0900
+
+indi-vixen-wirelessunit (0.1.129-1) trixie; urgency=medium
+
+  * Make all runtime INDI messages safe under Debian format-security checks.
+  * Apply the Debian format-security warning policy during regular driver builds.
+  * Preserve build helper scripts when staging or archiving the source tree.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Tue, 22 Sep 2026 00:00:00 +0900
+
+indi-vixen-wirelessunit (0.1.128-1) trixie; urgency=medium
+
+  * Use a manually edited Host or Port without automatic discovery.
+  * Keep loaded configuration distinct from an operator endpoint override.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Sun, 21 Sep 2026 00:00:00 +0900
+
+indi-vixen-wirelessunit (0.1.127-1) trixie; urgency=medium
+
+  * Gate real-device connections on Device discovery results.
+  * Automatically discover the Wireless Unit only when no scan has run.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Sun, 21 Sep 2026 00:00:00 +0900
+
+indi-vixen-wirelessunit (0.1.126-1) trixie; urgency=medium
+
+  * Add indi-3rdparty-compatible Debian packaging.
+  * Run the protocol, simulator, and INDI XML tests during package builds.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Sun, 21 Sep 2026 00:00:00 +0900

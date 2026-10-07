@@ -1,0 +1,23 @@
+Source: indi-vixen-wirelessunit
+Section: science
+Priority: optional
+Maintainer: Satoshi Masuko <wakeup1002@gmail.com>
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 13),
+ cmake (>= 3.16),
+ indi-bin (>= 2.2.3),
+ libindi-dev (>= 2.2.3),
+ libnova-dev,
+ pkg-config,
+ python3 (>= 3.10)
+Standards-Version: 4.7.2
+
+Package: indi-vixen-wirelessunit
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: kstars
+Description: INDI driver for the Vixen Wireless Unit
+ This package provides an INDI telescope driver for the Vixen Wireless Unit
+ used with Vixen mounts such as the SXP2. It communicates with Wireless Unit
+ firmware 2.60 over UDP and supports GoTo, tracking, parking, pulse guiding,
+ alignment management, mount settings, and Wi-Fi configuration.

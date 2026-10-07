@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_OPTIONS = parallel=$(shell nproc)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CXXFLAGS_MAINT_APPEND = -Wall -Wextra -Wpedantic -fPIC
+
+%:
+	dh $@ --buildsystem=cmake --sourcedirectory=indi-vixen-wirelessunit
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DVIXEN_BUILD_INDI_DRIVER=ON \
+		-DVIXEN_EXPECTED_INDI_PACKAGE_VERSION=2.2.3.1 \
+		-DBUILD_TESTING=ON
+
+override_dh_auto_test:
+	CTEST_OUTPUT_ON_FAILURE=1 dh_auto_test
+
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/tmp

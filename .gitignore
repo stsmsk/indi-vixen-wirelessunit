@@ -1,0 +1,29 @@
+# Build products
+/build/
+/build-*/
+/work/
+*.deb
+*.buildinfo
+*.changes
+*.tar.gz
+
+# Logs and captures
+/log/
+/outputs/
+*.log
+*.pcap
+*.pcapng
+
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+
+# Editors and operating systems
+.DS_Store
+._*
+*~
+*.swp
+.idea/
+.vscode/

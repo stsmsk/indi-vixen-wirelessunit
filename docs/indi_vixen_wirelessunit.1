@@ -1,0 +1,50 @@
+.\" Copyright (C) 2026 Satoshi Masuko <wakeup1002@gmail.com>
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.TH INDI_VIXEN_WIRELESSUNIT 1 "2026-09-24" "indi-vixen-wirelessunit 0.1.136" "User Commands"
+.SH NAME
+indi_vixen_wirelessunit \- INDI telescope driver for the Vixen Wireless Unit
+.SH SYNOPSIS
+.B indiserver
+.RI [ options ]
+.B indi_vixen_wirelessunit
+.SH DESCRIPTION
+.B indi_vixen_wirelessunit
+is an INDI telescope and guider driver for the Vixen Wireless Unit.
+It supports Vixen mounts such as the SXP2 and communicates with Wireless Unit
+firmware 2.60 over UDP.
+.PP
+The driver provides device discovery, GoTo, synchronization, tracking,
+parking, manual motion, pulse guiding, alignment management, mount settings,
+and Wireless Unit Wi-Fi configuration.
+.PP
+The Main Control tab provides an optional Assume HOME setting. It is disabled
+by default. When enabled, an uninitialized mount is initialized on Connect at
+the current physical position, which must first be placed at azimuth 270
+degrees and altitude 0 degrees. A failed attempt leaves manual Home set
+available.
+It is normally started by
+.BR indiserver (1)
+or by an INDI client such as KStars/Ekos, rather than run directly.
+.SH NETWORK
+The default Wireless Unit command port is UDP port 60023.
+The Connection tab can discover a unit on local IPv4 networks or use a Host
+and Port entered by the operator.
+Automatic discovery attempts up to four searches at five-second intervals
+when no unit responds. Disconnect cancels pending searches.
+Manual Search performs one search.
+An operator-edited endpoint is contacted directly without automatic discovery.
+.SH FILES
+.TP
+.I /usr/share/indi/indi_vixen_wirelessunit.xml
+INDI driver registration metadata.
+.TP
+.I /usr/share/doc/indi-vixen-wirelessunit/COPYING
+GNU General Public License text.
+.SH SEE ALSO
+.BR indiserver (1),
+.BR kstars (1)
+.SH AUTHOR
+Written by Satoshi Masuko <wakeup1002@gmail.com>.
+.SH COPYRIGHT
+Copyright 2026 Satoshi Masuko.
+Licensed under the GNU General Public License, version 3 or later.

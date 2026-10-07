@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+driver=/usr/bin/indi_vixen_wirelessunit
+xml=/usr/share/indi/indi_vixen_wirelessunit.xml
+
+test -x "$driver"
+test -r "$xml"
+
+version=$(sed -n 's:.*<version>\([^<][^<]*\)</version>.*:\1:p' "$xml")
+test -n "$version"
+
+python3 indi-vixen-wirelessunit/tests/driver_xml_simulation_test.py \
+    --driver "$driver" \
+    --indiserver /usr/bin/indiserver \
+    --expected-version "$version"
