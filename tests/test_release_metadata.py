@@ -181,6 +181,7 @@ def test_package_version_is_shared_with_driver_and_xml():
     assert "-name '._*'" in build_script
     assert "-name '*.pyc'" in build_script
     assert "--null -T -" in build_script
+    assert 'chmod 0644 "${build_root}/debian/${driver_name}.install"' in build_script
 
 
 def test_current_manual_slew_rates_match_ui_and_docs():

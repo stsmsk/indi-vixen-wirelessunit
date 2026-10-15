@@ -11,7 +11,7 @@ driver_name="indi-vixen-wirelessunit"
 build_root="${source_dir}/build/deb_indi-3rdparty_${driver_name}"
 staged_source="${build_root}/${driver_name}"
 
-for command in cmake dh dpkg-deb fakeroot tar; do
+for command in chmod cmake dh dpkg-deb fakeroot tar; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         echo "ERROR: required command not found: ${command}" >&2
         exit 1
@@ -54,6 +54,11 @@ cmake -E make_directory "${staged_source}"
 cmake -E copy_directory \
     "${source_dir}/debian/${driver_name}" \
     "${build_root}/debian"
+
+# FAT/exFAT volumes and some archive/copy tools can add executable bits to
+# ordinary debhelper configuration files. An executable *.install file is
+# treated as a program by debhelper instead of as an installation manifest.
+chmod 0644 "${build_root}/debian/${driver_name}.install"
 
 cd "${build_root}"
 fakeroot debian/rules binary
