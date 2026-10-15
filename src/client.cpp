@@ -21,6 +21,8 @@ namespace
 constexpr auto kWifiInformationTimeout = std::chrono::milliseconds(1500);
 constexpr auto kWifiScanTimeout = std::chrono::milliseconds(5000);
 constexpr auto kWifiReconfigurationTimeout = std::chrono::milliseconds(30000);
+constexpr auto kSafetyStopTimeout = std::chrono::milliseconds(300);
+constexpr unsigned kSafetyStopMaximumAttempts = 3;
 
 } // namespace
 
@@ -78,6 +80,20 @@ Result<void> ProtocolClient::command(std::string_view request, std::chrono::mill
     if (!response)
         return { false, std::move(response.error) };
     return { true, {} };
+}
+
+Result<void> ProtocolClient::retryIdempotentStop(std::string_view request)
+{
+    std::string lastError = "stop command was not attempted";
+    for (unsigned attempt = 0; attempt < kSafetyStopMaximumAttempts; ++attempt)
+    {
+        auto result = command(request, kSafetyStopTimeout);
+        if (result)
+            return result;
+        lastError = std::move(result.error);
+    }
+    return { false, "stop command failed after " + std::to_string(kSafetyStopMaximumAttempts) +
+                    " attempts: " + lastError };
 }
 
 Result<void> ProtocolClient::targetCommand(std::string_view request)
@@ -265,7 +281,14 @@ Result<void> ProtocolClient::deleteAlignmentPoint(std::size_t zeroBasedIndex)
 
 Result<void> ProtocolClient::abortMotion()
 {
-    return command(stopMount());
+    return retryIdempotentStop(stopMount());
+}
+
+Result<void> ProtocolClient::stopBeforeInitialization()
+{
+    // Only the zero-rate MTMV0 form is safe to retry. Retrying a non-zero
+    // finite-duration motion after a lost ACK would extend that motion.
+    return retryIdempotentStop(vixen::wirelessunit::moveBeforeInitialization(1.0, 0.0, 0.0));
 }
 
 Result<void> ProtocolClient::moveBeforeInitialization(double durationSeconds, double raSiderealRate,

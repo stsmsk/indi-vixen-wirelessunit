@@ -7,6 +7,7 @@
  */
 
 #include "client.hpp"
+#include "motion_safety.hpp"
 #include "simulator_transport.hpp"
 
 #ifdef NDEBUG
@@ -72,6 +73,14 @@ class FakeTransport final : public vixen::wirelessunit::ITransport
 
 int main()
 {
+    using vixen::wirelessunit::motion_safety::stopRequiredBeforeDisconnect;
+    assert(!stopRequiredBeforeDisconnect(false, false, false, false, false));
+    assert(stopRequiredBeforeDisconnect(true, false, false, false, false));
+    assert(stopRequiredBeforeDisconnect(false, true, false, false, false));
+    assert(stopRequiredBeforeDisconnect(false, false, true, false, false));
+    assert(stopRequiredBeforeDisconnect(false, false, false, true, false));
+    assert(stopRequiredBeforeDisconnect(false, false, false, false, true));
+
     auto fake = std::make_unique<FakeTransport>();
     auto *transport = fake.get();
     transport->exchanges.push_back({
@@ -385,6 +394,14 @@ int main()
             { true, "$OTHER=1\r\n", {} }
         });
         ackTransport->exchanges.push_back({
+            "$MTSTP=1\r\n",
+            { false, {}, "receive: timeout" }
+        });
+        ackTransport->exchanges.push_back({
+            "$MTSTP=1\r\n",
+            { true, "$MTSTP=NG\r\n", {} }
+        });
+        ackTransport->exchanges.push_back({
             "$MTPWR=3\r\n",
             { true, "$MTPWR=2\r\n", {} }
         });
@@ -426,6 +443,46 @@ int main()
         assert(ackClient.syncRaDec(20.706113, 45.379394));
         assert(ackClient.setWifiStationSettings(true, "ExampleNetworkB", "password"));
         assert(ackTransport->exchanges.empty());
+    }
+
+    // Safety-stop commands are idempotent and retry after a lost response.
+    // Normal non-zero motion commands deliberately remain single-shot.
+    {
+        auto retryFake = std::make_unique<FakeTransport>();
+        auto *retryTransport = retryFake.get();
+        retryTransport->exchanges.push_back({
+            "$MTSTP=1\r\n", { false, {}, "receive: timeout" }
+        });
+        retryTransport->exchanges.push_back({
+            "$MTSTP=1\r\n", { true, "$MTSTP=NG\r\n", {} }
+        });
+        retryTransport->exchanges.push_back({
+            "$MTSTP=1\r\n", { true, "$MTSTP=1\r\n", {} }
+        });
+        retryTransport->exchanges.push_back({
+            "$MTMV0=1.0,0.0000,0.0000\r\n", { false, {}, "receive: timeout" }
+        });
+        retryTransport->exchanges.push_back({
+            "$MTMV0=1.0,0.0000,0.0000\r\n", { true, "$MTMV0=1.0,0.0000,0.0000\r\n", {} }
+        });
+        retryTransport->exchanges.push_back({
+            "$MTMV2=1.00,1.000000,0.000000\r\n", { false, {}, "receive: timeout" }
+        });
+
+        vixen::wirelessunit::ProtocolClient retryClient(std::move(retryFake));
+        std::string retryError;
+        assert(retryClient.connect(retryError));
+        assert(retryClient.abortMotion());
+        assert(retryClient.stopBeforeInitialization());
+        assert(!retryClient.moveRaDec(1.0, 1.0, 0.0));
+        assert(retryTransport->requests.size() == 6);
+        assert(retryTransport->timeouts[0] == std::chrono::milliseconds(300));
+        assert(retryTransport->timeouts[1] == std::chrono::milliseconds(300));
+        assert(retryTransport->timeouts[2] == std::chrono::milliseconds(300));
+        assert(retryTransport->timeouts[3] == std::chrono::milliseconds(300));
+        assert(retryTransport->timeouts[4] == std::chrono::milliseconds(300));
+        assert(retryTransport->timeouts[5] == std::chrono::milliseconds(500));
+        assert(retryTransport->exchanges.empty());
     }
 
     // Every batch stage can fail either before application (NG) or after the

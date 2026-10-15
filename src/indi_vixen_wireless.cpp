@@ -10,6 +10,7 @@
 
 #include "discovery.hpp"
 #include "indicom.h"
+#include "motion_safety.hpp"
 #include "motion_timing.hpp"
 #include "numeric_validation.hpp"
 #include "simulator_transport.hpp"
@@ -1105,7 +1106,7 @@ bool VixenWirelessUnit::initializeHome(bool automatic)
     // Match the Android STAR BOOK Wireless startup sequence: stop both
     // pre-initialization axes, apply the current site and UTC, then consume
     // the once-per-power-session MTINI command.
-    const auto stopped = client_->moveBeforeInitialization(1.0, 0.0, 0.0);
+    const auto stopped = client_->stopBeforeInitialization();
     if (!stopped)
     {
         publish(IPS_ALERT, "Could not stop pre-initialization motion.");
@@ -2946,6 +2947,21 @@ bool VixenWirelessUnit::Connect()
 bool VixenWirelessUnit::Disconnect()
 {
     cancelAutomaticDiscoveryConnect(nullptr, false);
+    const bool reportedMotion = status_ && (status_->status == 2 || status_->status == 3);
+    const bool stopRequired = vixen::wirelessunit::motion_safety::stopRequiredBeforeDisconnect(
+                                  manualMotionActive(), guidePulseActive(),
+                                  TrackState == SCOPE_SLEWING, TrackState == SCOPE_PARKING,
+                                  reportedMotion);
+    if (client_ && stopRequired)
+    {
+        const auto stopped = stopMountMotion();
+        if (stopped)
+            LOG_INFO("Stopped active mount motion before disconnecting.");
+        else
+            LOGF_ERROR("Safety stop before disconnect failed: %s. "
+                       "The mount may still be moving; disconnecting anyway.",
+                       stopped.error.c_str());
+    }
     cancelGuideTimers();
     if (client_)
         client_->disconnect();
@@ -3625,9 +3641,7 @@ bool VixenWirelessUnit::Abort()
         GuideComplete(AXIS_RA);
     if (!client_)
         return false;
-    const auto result = initializationState_ == MountInitializationState::uninitialized
-                            ? client_->moveBeforeInitialization(1.0, 0.0, 0.0)
-                            : client_->abortMotion();
+    const auto result = stopMountMotion();
     if (result)
     {
         // MTSTP is acknowledged before an initialized SXP2 finishes
@@ -3640,6 +3654,15 @@ bool VixenWirelessUnit::Abort()
     else
         LOGF_ERROR("Abort failed: %s", result.error.c_str());
     return static_cast<bool>(result);
+}
+
+vixen::wirelessunit::Result<void> VixenWirelessUnit::stopMountMotion()
+{
+    if (!client_)
+        return { false, "not connected" };
+    return initializationState_ == MountInitializationState::uninitialized
+               ? client_->stopBeforeInitialization()
+               : client_->abortMotion();
 }
 
 bool VixenWirelessUnit::SetSlewRate(int index)

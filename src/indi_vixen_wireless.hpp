@@ -93,6 +93,7 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
         bool guidePulseActive() const;
         bool manualMotionStartAllowed() const;
         bool targetMotionStartAllowed(const char *operation) const;
+        vixen::wirelessunit::Result<void> stopMountMotion();
         void abandonManualMotion(const char *message);
         bool requireInitialized(const char *operation);
         bool wifiOperationAllowed(const char *operation) const;

@@ -88,6 +88,7 @@ class ProtocolClient
         Result<void> syncAltAz(double azimuthDegrees, double altitudeDegrees);
         Result<void> deleteAlignmentPoint(std::size_t zeroBasedIndex);
         Result<void> abortMotion();
+        Result<void> stopBeforeInitialization();
         Result<void> moveBeforeInitialization(double durationSeconds, double raSiderealRate,
                                               double decSiderealRate);
         Result<void> moveRaDec(double durationSeconds, double raSiderealRate, double decSiderealRate);
@@ -112,6 +113,7 @@ class ProtocolClient
                                   bool acceptNegativeResponse = false);
         Result<void> command(std::string_view request,
                              std::chrono::milliseconds timeout = std::chrono::milliseconds(500));
+        Result<void> retryIdempotentStop(std::string_view request);
         Result<void> targetCommand(std::string_view request);
 
         template <typename T, typename Decoder>
