@@ -44,6 +44,7 @@ cmake -E make_directory "${staged_source}"
            -path './work' -o \
            -path '*/__pycache__' \) -prune -o \
         \( -name '.DS_Store' -o \
+           -name '._*' -o \
            -name '*.pyc' -o \
            -name '*.log' -o \
            -name '*.tar.gz' \) -prune -o \

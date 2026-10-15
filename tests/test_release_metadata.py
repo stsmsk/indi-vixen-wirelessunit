@@ -30,7 +30,10 @@ def test_retired_environment_specific_fixtures_do_not_return():
         relative = path.relative_to(ROOT)
         if any(part == ".git" or part.startswith("build") for part in relative.parts):
             continue
-        content = path.read_text(encoding="utf-8")
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as error:
+            raise AssertionError(f"Audited source file is not UTF-8: {relative}") from error
         for value in forbidden_values:
             assert value not in content, f"Retired environment-specific value found in {relative}"
 
@@ -175,6 +178,7 @@ def test_package_version_is_shared_with_driver_and_xml():
     assert "-path './log'" in build_script
     assert "-path './outputs'" in build_script
     assert "-path '*/__pycache__'" in build_script
+    assert "-name '._*'" in build_script
     assert "-name '*.pyc'" in build_script
     assert "--null -T -" in build_script
 
