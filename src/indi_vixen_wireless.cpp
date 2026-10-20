@@ -2972,6 +2972,13 @@ bool VixenWirelessUnit::Disconnect()
                                   manualMotionActive(), guidePulseActive(),
                                   TrackState == SCOPE_SLEWING, TrackState == SCOPE_TRACKING,
                                   TrackState == SCOPE_PARKING, reportedActive);
+
+    // Publish Idle/Tracking Off before the final transport transaction. If
+    // this is delayed until after MTSTP, DefaultDevice removes the connected
+    // properties immediately when Disconnect() returns and KStars can receive
+    // delProperty before the queued EQUATORIAL_EOD_COORD Idle update. The
+    // MTSTP round trip below gives the client time to consume this reset.
+    resetTransientMountStateForDisconnect();
     if (client_ && stopRequired)
     {
         const auto stopped = stopMountMotion();
@@ -2982,7 +2989,6 @@ bool VixenWirelessUnit::Disconnect()
                        "The mount may still be moving; disconnecting anyway.",
                        stopped.error.c_str());
     }
-    resetTransientMountStateForDisconnect();
     cancelGuideTimers();
     if (client_)
         client_->disconnect();

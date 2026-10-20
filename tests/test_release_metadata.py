@@ -245,6 +245,16 @@ def test_disconnect_publishes_transient_mount_state_reset():
     assert "AbortSP.apply();" in body
     assert "MovementNSSP.apply();" in body
     assert "MovementWESP.apply();" in body
+    disconnect = re.search(
+        r"bool VixenWirelessUnit::Disconnect\(\).*?\n\}",
+        source,
+        re.DOTALL,
+    )
+    assert disconnect is not None
+    disconnect_body = disconnect.group(0)
+    assert disconnect_body.index("resetTransientMountStateForDisconnect();") < disconnect_body.index(
+        "stopMountMotion();"
+    )
 
 
 def test_connected_config_load_does_not_promote_unsent_guide_rates():
