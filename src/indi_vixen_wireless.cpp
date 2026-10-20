@@ -3722,17 +3722,24 @@ void VixenWirelessUnit::resetTransientMountStateForDisconnect()
                                  status_ && status_->status == 1 && status_->targetObjectType == 1 &&
                                  isParked();
     if (confirmedParked)
-    {
         TrackState = SCOPE_PARKED;
-        synchronizeTransientMountProperties();
-        return;
+    else
+    {
+        if (isParked() || ParkSP[PARK].getState() == ISS_ON ||
+                ParkSP.getState() == IPS_BUSY || ParkSP.getState() == IPS_ALERT)
+            SetParked(false);
+        TrackState = SCOPE_IDLE;
     }
 
-    if (isParked() || ParkSP[PARK].getState() == ISS_ON ||
-            ParkSP.getState() == IPS_BUSY || ParkSP.getState() == IPS_ALERT)
-        SetParked(false);
-    TrackState = SCOPE_IDLE;
     synchronizeTransientMountProperties();
+    // Disconnect() runs before the connected-only properties are removed.
+    // Publish the reset now so KStars does not retain its last Tracking,
+    // Slewing, Parking, manual-motion, or Abort display after disconnection.
+    TrackStateSP.apply();
+    EqNP.apply();
+    AbortSP.apply();
+    MovementNSSP.apply();
+    MovementWESP.apply();
 }
 
 void VixenWirelessUnit::synchronizeTransientMountProperties()

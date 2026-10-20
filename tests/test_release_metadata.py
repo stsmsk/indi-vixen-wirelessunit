@@ -229,6 +229,24 @@ def test_motion_failures_discard_manual_intent_and_operations_are_interlocked():
     assert "Pulse guide is unavailable while GoTo is active" in source
 
 
+def test_disconnect_publishes_transient_mount_state_reset():
+    source = (ROOT / "src/indi_vixen_wireless.cpp").read_text(encoding="utf-8")
+    reset = re.search(
+        r"void VixenWirelessUnit::resetTransientMountStateForDisconnect\(\).*?\n\}",
+        source,
+        re.DOTALL,
+    )
+    assert reset is not None
+    body = reset.group(0)
+    assert "TrackState = SCOPE_IDLE" in body
+    assert "synchronizeTransientMountProperties();" in body
+    assert "TrackStateSP.apply();" in body
+    assert "EqNP.apply();" in body
+    assert "AbortSP.apply();" in body
+    assert "MovementNSSP.apply();" in body
+    assert "MovementWESP.apply();" in body
+
+
 def test_connected_config_load_does_not_promote_unsent_guide_rates():
     source = (ROOT / "src/indi_vixen_wireless.cpp").read_text(encoding="utf-8")
     guard = source.index(
