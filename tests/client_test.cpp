@@ -74,12 +74,13 @@ class FakeTransport final : public vixen::wirelessunit::ITransport
 int main()
 {
     using vixen::wirelessunit::motion_safety::stopRequiredBeforeDisconnect;
-    assert(!stopRequiredBeforeDisconnect(false, false, false, false, false));
-    assert(stopRequiredBeforeDisconnect(true, false, false, false, false));
-    assert(stopRequiredBeforeDisconnect(false, true, false, false, false));
-    assert(stopRequiredBeforeDisconnect(false, false, true, false, false));
-    assert(stopRequiredBeforeDisconnect(false, false, false, true, false));
-    assert(stopRequiredBeforeDisconnect(false, false, false, false, true));
+    assert(!stopRequiredBeforeDisconnect(false, false, false, false, false, false));
+    assert(stopRequiredBeforeDisconnect(true, false, false, false, false, false));
+    assert(stopRequiredBeforeDisconnect(false, true, false, false, false, false));
+    assert(stopRequiredBeforeDisconnect(false, false, true, false, false, false));
+    assert(stopRequiredBeforeDisconnect(false, false, false, true, false, false));
+    assert(stopRequiredBeforeDisconnect(false, false, false, false, true, false));
+    assert(stopRequiredBeforeDisconnect(false, false, false, false, false, true));
 
     auto fake = std::make_unique<FakeTransport>();
     auto *transport = fake.get();

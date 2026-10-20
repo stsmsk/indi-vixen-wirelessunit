@@ -2965,11 +2965,13 @@ bool VixenWirelessUnit::Connect()
 bool VixenWirelessUnit::Disconnect()
 {
     cancelAutomaticDiscoveryConnect(nullptr, false);
-    const bool reportedMotion = status_ && (status_->status == 2 || status_->status == 3);
+    const bool reportedTracking = status_ && status_->status == 1 && status_->targetObjectType >= 3 &&
+                                  !trackingKnownStopped_;
+    const bool reportedActive = status_ && (status_->status == 2 || status_->status == 3 || reportedTracking);
     const bool stopRequired = vixen::wirelessunit::motion_safety::stopRequiredBeforeDisconnect(
                                   manualMotionActive(), guidePulseActive(),
-                                  TrackState == SCOPE_SLEWING, TrackState == SCOPE_PARKING,
-                                  reportedMotion);
+                                  TrackState == SCOPE_SLEWING, TrackState == SCOPE_TRACKING,
+                                  TrackState == SCOPE_PARKING, reportedActive);
     if (client_ && stopRequired)
     {
         const auto stopped = stopMountMotion();

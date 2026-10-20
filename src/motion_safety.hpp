@@ -12,10 +12,11 @@ namespace vixen::wirelessunit::motion_safety
 {
 
 inline bool stopRequiredBeforeDisconnect(bool manualMotion, bool guidePulse,
-                                         bool scopeSlewing, bool scopeParking,
-                                         bool reportedMotion) noexcept
+                                         bool scopeSlewing, bool scopeTracking,
+                                         bool scopeParking, bool reportedActive) noexcept
 {
-    return manualMotion || guidePulse || scopeSlewing || scopeParking || reportedMotion;
+    return manualMotion || guidePulse || scopeSlewing || scopeTracking ||
+           scopeParking || reportedActive;
 }
 
 } // namespace vixen::wirelessunit::motion_safety
