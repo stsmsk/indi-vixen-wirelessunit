@@ -1502,13 +1502,13 @@ void VixenWirelessUnit::startAutomaticDiscoveryConnect()
 {
     if (automaticConnectPending_)
     {
-        setConnected(false, IPS_BUSY, "Automatic Wireless Unit discovery is already in progress.");
+        setAutomaticConnectionBusy("Automatic Wireless Unit discovery is already in progress.");
         return;
     }
 
     automaticConnectPending_ = true;
     automaticDiscoveryAttempt_ = 0;
-    setConnected(false, IPS_BUSY, "Starting automatic Wireless Unit discovery...");
+    setAutomaticConnectionBusy("Starting automatic Wireless Unit discovery...");
     runAutomaticDiscoveryAttempt();
 }
 
@@ -1532,7 +1532,7 @@ void VixenWirelessUnit::runAutomaticDiscoveryAttempt()
     if (result == DiscoveryResult::noResponse &&
         automaticDiscoveryAttempt_ < kAutomaticDiscoveryMaximumAttempts)
     {
-        setConnected(false, IPS_BUSY, "Wireless Unit was not found; automatic discovery will retry.");
+        setAutomaticConnectionBusy("Wireless Unit was not found; automatic discovery will retry.");
         automaticDiscoveryTimerId_ = IEAddTimer(
             kAutomaticDiscoveryRetryMilliseconds, automaticDiscoveryRetryHelper, this);
         return;
@@ -1571,6 +1571,24 @@ void VixenWirelessUnit::finishAutomaticDiscoveryConnect()
     if (deviceDiscoveryState_ == DeviceDiscoveryState::found)
         deviceDiscoveryState_ = DeviceDiscoveryState::unavailable;
     setConnected(false, IPS_ALERT, "Wireless Unit was found, but the connection or handshake failed.");
+}
+
+void VixenWirelessUnit::setAutomaticConnectionBusy(const char *message)
+{
+    auto connection = getSwitch("CONNECTION");
+    if (!connection)
+    {
+        setConnected(false, IPS_BUSY, message);
+        return;
+    }
+
+    connection.reset();
+    if (auto *connect = connection.findWidgetByName("CONNECT"))
+        connect->setState(ISS_ON);
+    if (auto *disconnect = connection.findWidgetByName("DISCONNECT"))
+        disconnect->setState(ISS_OFF);
+    connection.setState(IPS_BUSY);
+    connection.apply("%s", message ? message : "Connecting to the Wireless Unit...");
 }
 
 void VixenWirelessUnit::cancelAutomaticDiscoveryConnect(const char *message, bool updateConnection)
@@ -1621,7 +1639,7 @@ bool VixenWirelessUnit::ISNewSwitch(const char *dev, const char *name, ISState *
         {
             if (automaticConnectPending_)
             {
-                setConnected(false, IPS_BUSY, "Automatic Wireless Unit discovery is already in progress.");
+                setAutomaticConnectionBusy("Automatic Wireless Unit discovery is already in progress.");
                 return true;
             }
             const bool discoveryRequired = deviceDiscoveryState_ == DeviceDiscoveryState::notScanned ||

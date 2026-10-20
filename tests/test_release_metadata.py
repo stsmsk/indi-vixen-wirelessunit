@@ -83,6 +83,19 @@ def test_automatic_discovery_retries_without_blocking_the_driver():
     assert "Automatic Wireless Unit discovery is already in progress" in source
     assert "automaticDiscoveryAttempt_ < kAutomaticDiscoveryMaximumAttempts" in source
     assert "cancelAutomaticDiscoveryConnect" in source
+    connection_busy = re.search(
+        r"void VixenWirelessUnit::setAutomaticConnectionBusy\(.*?\n\}",
+        source,
+        re.DOTALL,
+    )
+    assert connection_busy is not None
+    assert 'findWidgetByName("CONNECT")' in connection_busy.group(0)
+    assert "connect->setState(ISS_ON)" in connection_busy.group(0)
+    assert 'findWidgetByName("DISCONNECT")' in connection_busy.group(0)
+    assert "disconnect->setState(ISS_OFF)" in connection_busy.group(0)
+    assert "connection.setState(IPS_BUSY)" in connection_busy.group(0)
+    assert 'setConnected(false, IPS_BUSY, "Starting automatic' not in source
+    assert 'setConnected(false, IPS_BUSY, "Wireless Unit was not found' not in source
     assert "discoverWirelessUnit(false) == DiscoveryResult::found" in source
     assert "unsigned maximumAttempts = 1" in header
     assert "Run Search again before connecting" not in source

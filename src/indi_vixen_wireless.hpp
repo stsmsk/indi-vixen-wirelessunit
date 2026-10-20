@@ -86,6 +86,7 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
         void runAutomaticDiscoveryAttempt();
         void finishAutomaticDiscoveryConnect();
         void cancelAutomaticDiscoveryConnect(const char *message = nullptr, bool updateConnection = true);
+        void setAutomaticConnectionBusy(const char *message);
         static void automaticDiscoveryRetryHelper(void *context);
         void automaticDiscoveryRetry();
         bool sendContinuousMotion();
