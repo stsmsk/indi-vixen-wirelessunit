@@ -274,8 +274,15 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
         lambda vector: vector.attrib.get("state") == "Ok",
     )
     peer.wait_for(lambda data: find_del_property(data, "WIRELESS_SET_HOME_POSITION"), start)
-    # A rejection immediately before disconnect must not reappear as a stale
-    # red indicator when the deletion control is redefined on reconnect.
+    # Disconnecting during Park must not carry SCOPE_PARKING into the next
+    # connection. A rejection immediately before that disconnect must also
+    # not reappear as a stale red indicator when controls are redefined.
+    start = peer.send(switch_xml("TELESCOPE_PARK", {"PARK": "On", "UNPARK": "Off"}))
+    peer.wait_vector(
+        "setSwitchVector", "TELESCOPE_PARK", start,
+        lambda vector: vector.attrib.get("state") == "Busy" and
+                       element_value(vector, "PARK") == "On",
+    )
     start = peer.send(switch_xml("WIRELESS_ALIGNMENT_DELETE", {"DELETE_SELECTED": "On"}))
     peer.wait_vector(
         "setSwitchVector", "WIRELESS_ALIGNMENT_DELETE", start,
@@ -301,6 +308,20 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
     peer.wait_vector(
         "defSwitchVector", "WIRELESS_ALIGNMENT_DELETE", start,
         lambda vector: vector.attrib.get("state") == "Idle",
+    )
+    peer.wait_vector(
+        "defSwitchVector", "TELESCOPE_PARK", start,
+        lambda vector: vector.attrib.get("state") != "Busy" and
+                       element_value(vector, "UNPARK") == "On",
+    )
+    peer.wait_vector(
+        "defSwitchVector", "TELESCOPE_TRACK_STATE", start,
+        lambda vector: vector.attrib.get("state") == "Idle" and
+                       element_value(vector, "TRACK_OFF") == "On",
+    )
+    peer.wait_vector(
+        "defNumberVector", "EQUATORIAL_EOD_COORD", start,
+        lambda vector: vector.attrib.get("state") != "Busy",
     )
     start = peer.send(switch_xml("CONNECTION", {"CONNECT": "Off", "DISCONNECT": "On"}))
     peer.wait_vector(

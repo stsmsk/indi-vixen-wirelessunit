@@ -2962,6 +2962,7 @@ bool VixenWirelessUnit::Disconnect()
                        "The mount may still be moving; disconnecting anyway.",
                        stopped.error.c_str());
     }
+    resetTransientMountStateForDisconnect();
     cancelGuideTimers();
     if (client_)
         client_->disconnect();
@@ -3047,6 +3048,8 @@ bool VixenWirelessUnit::Handshake()
     updateInitializationState(*status_);
     trackingKnownStopped_ = initializationState_ != MountInitializationState::initialized ||
                             (status_->status == 1 && status_->targetObjectType < 3);
+    reconcileMountStateFromStatus();
+    synchronizeTransientMountProperties();
     updateFirmwareProperties(*wirelessVersion.value, *identity.value);
     const auto site = client_->location();
     if (site)
@@ -3495,8 +3498,7 @@ bool VixenWirelessUnit::ReadScopeStatus()
 
     if (initializationState_ != MountInitializationState::initialized)
     {
-        TrackState = SCOPE_IDLE;
-        trackingKnownStopped_ = true;
+        reconcileMountStateFromStatus();
         if (TrackStateSP[TRACK_ON].getState() == ISS_ON || TrackStateSP.getState() != IPS_IDLE)
         {
             TrackStateSP.reset();
@@ -3510,35 +3512,7 @@ bool VixenWirelessUnit::ReadScopeStatus()
         return true;
     }
 
-    const bool parking = TrackState == SCOPE_PARKING;
-    const bool parked = TrackState == SCOPE_PARKED || isParked();
-
-    // SXP2 reports 2 while slewing and 3 while decelerating after MTSTP.
-    // Preserve the distinct parking state while the HOME slew is active.
-    // Once SetParked(true) has completed, later status-1 HOME replies must not
-    // demote SCOPE_PARKED back to SCOPE_IDLE.
-    if (parked)
-    {
-        TrackState = SCOPE_PARKED;
-        trackingKnownStopped_ = true;
-    }
-    else if (status_->status == 2 || status_->status == 3)
-        TrackState = parking ? SCOPE_PARKING : SCOPE_SLEWING;
-    else if (parking && status_->status == 1 && status_->targetObjectType == 1)
-    {
-        SetParked(true);
-        LOG_INFO("Parking completed at the Wireless Unit HOME position.");
-    }
-    else if (parking)
-        TrackState = SCOPE_PARKING;
-    else if (status_->status == 1 && status_->targetObjectType >= 3 && !trackingKnownStopped_)
-        TrackState = SCOPE_TRACKING;
-    else
-    {
-        TrackState = SCOPE_IDLE;
-        if (status_->status == 1 && status_->targetObjectType < 3)
-            trackingKnownStopped_ = true;
-    }
+    reconcileMountStateFromStatus();
 
     // The INDI base class marks the complete Tracking switch vector Alert
     // when a tracking command is rejected. That makes both On and Off appear
@@ -3663,6 +3637,107 @@ vixen::wirelessunit::Result<void> VixenWirelessUnit::stopMountMotion()
     return initializationState_ == MountInitializationState::uninitialized
                ? client_->stopBeforeInitialization()
                : client_->abortMotion();
+}
+
+void VixenWirelessUnit::reconcileMountStateFromStatus()
+{
+    if (!status_)
+        return;
+
+    const bool parkingRequested = TrackState == SCOPE_PARKING;
+    const bool parkedWasConfirmed = isParked();
+    const bool stoppedAtHome = status_->status == 1 && status_->targetObjectType == 1;
+    const bool moving = status_->status == 2 || status_->status == 3;
+    const bool parkPropertyIsTransient = ParkSP.getState() == IPS_BUSY || ParkSP.getState() == IPS_ALERT;
+
+    auto clearUnconfirmedPark = [this, parkPropertyIsTransient]()
+    {
+        if (isParked() || ParkSP[PARK].getState() == ISS_ON || parkPropertyIsTransient)
+            SetParked(false);
+    };
+
+    if (initializationState_ != MountInitializationState::initialized)
+    {
+        clearUnconfirmedPark();
+        TrackState = SCOPE_IDLE;
+        trackingKnownStopped_ = true;
+        return;
+    }
+
+    // A HOME label by itself is insufficient: MTINI also leaves the mount at
+    // HOME without meaning that the operator parked it. Require either the
+    // current Park operation or a previously confirmed/persisted Park state.
+    if (stoppedAtHome && (parkingRequested || parkedWasConfirmed))
+    {
+        if (!isParked() || ParkSP.getState() != IPS_OK)
+            SetParked(true);
+        TrackState = SCOPE_PARKED;
+        trackingKnownStopped_ = true;
+        if (parkingRequested)
+            LOG_INFO("Parking completed at the Wireless Unit HOME position.");
+        return;
+    }
+
+    if (moving)
+    {
+        clearUnconfirmedPark();
+        TrackState = parkingRequested ? SCOPE_PARKING : SCOPE_SLEWING;
+        return;
+    }
+
+    clearUnconfirmedPark();
+    if (status_->status == 1 && status_->targetObjectType >= 3 && !trackingKnownStopped_)
+        TrackState = SCOPE_TRACKING;
+    else
+    {
+        TrackState = SCOPE_IDLE;
+        if (status_->status == 1 && status_->targetObjectType < 3)
+            trackingKnownStopped_ = true;
+    }
+}
+
+void VixenWirelessUnit::resetTransientMountStateForDisconnect()
+{
+    const bool confirmedParked = initializationState_ == MountInitializationState::initialized &&
+                                 status_ && status_->status == 1 && status_->targetObjectType == 1 &&
+                                 isParked();
+    if (confirmedParked)
+    {
+        TrackState = SCOPE_PARKED;
+        synchronizeTransientMountProperties();
+        return;
+    }
+
+    if (isParked() || ParkSP[PARK].getState() == ISS_ON ||
+            ParkSP.getState() == IPS_BUSY || ParkSP.getState() == IPS_ALERT)
+        SetParked(false);
+    TrackState = SCOPE_IDLE;
+    synchronizeTransientMountProperties();
+}
+
+void VixenWirelessUnit::synchronizeTransientMountProperties()
+{
+    TrackStateSP.reset();
+    if (TrackState == SCOPE_TRACKING)
+    {
+        TrackStateSP[TRACK_ON].setState(ISS_ON);
+        TrackStateSP.setState(IPS_BUSY);
+        EqNP.setState(IPS_OK);
+    }
+    else
+    {
+        TrackStateSP[TRACK_OFF].setState(ISS_ON);
+        TrackStateSP.setState(IPS_IDLE);
+        EqNP.setState(TrackState == SCOPE_SLEWING || TrackState == SCOPE_PARKING ? IPS_BUSY : IPS_IDLE);
+    }
+
+    AbortSP.reset();
+    AbortSP.setState(IPS_IDLE);
+    MovementNSSP.reset();
+    MovementNSSP.setState(IPS_IDLE);
+    MovementWESP.reset();
+    MovementWESP.setState(IPS_IDLE);
+    RememberTrackState = TrackState;
 }
 
 bool VixenWirelessUnit::SetSlewRate(int index)
