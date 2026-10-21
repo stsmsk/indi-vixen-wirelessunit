@@ -1,3 +1,12 @@
+indi-vixen-wirelessunit (0.1.137-1) trixie; urgency=medium
+
+  * Stop active GoTo, tracking, manual motion, and guiding before disconnect.
+  * Reset transient mount properties before connected-only properties are removed.
+  * Retry automatic Wireless Unit discovery until cancelled.
+  * Improve Debian package staging and macOS metadata exclusion.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Wed, 21 Oct 2026 17:37:53 +0900
+
 indi-vixen-wirelessunit (0.1.136-1) trixie; urgency=medium
 
   * Add opt-in automatic HOME initialization for an uninitialized mount.

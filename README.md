@@ -1,7 +1,7 @@
 # INDI Vixen Wireless Unit
 
 Experimental INDI telescope and guider driver for the Vixen Wireless Unit.
-The current release is **0.1.136** and has been developed for an SXP2 mount,
+The current release is **0.1.137** and has been developed for an SXP2 mount,
 Wireless Unit firmware 2.60, Raspberry Pi OS Trixie, and INDI 2.2.3.1
 (public INDI API version 2.2.3).
 
@@ -49,7 +49,7 @@ On Raspberry Pi OS Trixie:
 
 ```bash
 ./scripts/build-deb-trixie.sh
-sudo apt install ./build/indi-vixen-wirelessunit_0.1.136-1_arm64.deb
+sudo apt install ./build/indi-vixen-wirelessunit_0.1.137-1_arm64.deb
 ```
 
 ## Protocol-only development build
