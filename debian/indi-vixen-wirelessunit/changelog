@@ -1,7 +1,8 @@
 indi-vixen-wirelessunit (0.1.137-1) trixie; urgency=medium
 
   * Stop active GoTo, tracking, manual motion, and guiding before disconnect.
-  * Reset transient mount properties before connected-only properties are removed.
+  * Reset transient mount properties before connected-only properties are
+    removed.
   * Retry automatic Wireless Unit discovery until cancelled.
   * Improve Debian package staging and macOS metadata exclusion.
 
@@ -64,7 +65,8 @@ indi-vixen-wirelessunit (0.1.130-1) trixie; urgency=medium
 indi-vixen-wirelessunit (0.1.129-1) trixie; urgency=medium
 
   * Make all runtime INDI messages safe under Debian format-security checks.
-  * Apply the Debian format-security warning policy during regular driver builds.
+  * Apply the Debian format-security warning policy during regular driver
+    builds.
   * Preserve build helper scripts when staging or archiving the source tree.
 
  -- Satoshi Masuko <wakeup1002@gmail.com>  Tue, 22 Sep 2026 00:00:00 +0900
