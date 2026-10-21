@@ -73,15 +73,19 @@ def test_automatic_discovery_retries_without_blocking_the_driver():
     assert no_response is not None
     assert "DiscoverySP.s = willRetry ? IPS_BUSY : IPS_ALERT" in no_response.group(1)
     assert "LOGF_ERROR(\"No Wireless Unit responded" in no_response.group(1)
-    assert "attempt < maximumAttempts" in no_response.group(1)
+    assert "maximumAttempts == 0 || attempt < maximumAttempts" in no_response.group(1)
     assert "deviceDiscoveryState_ == DeviceDiscoveryState::notScanned ||" in source
     assert "deviceDiscoveryState_ == DeviceDiscoveryState::unavailable" in source
-    assert "kAutomaticDiscoveryMaximumAttempts = 4" in source
     assert "kAutomaticDiscoveryRetryMilliseconds = 5000" in source
+    assert "kAutomaticDiscoveryInitialReportedAttempts = 4" in source
+    assert "kAutomaticDiscoverySteadyReportMilliseconds = 30000" in source
+    assert "kAutomaticDiscoverySteadyReportAttempts" in source
     assert "IEAddTimer(" in source
     assert "automaticDiscoveryRetryHelper" in source
     assert "Automatic Wireless Unit discovery is already in progress" in source
-    assert "automaticDiscoveryAttempt_ < kAutomaticDiscoveryMaximumAttempts" in source
+    assert "true, automaticDiscoveryAttempt_, 0, reportProgress" in source
+    assert "if (result == DiscoveryResult::noResponse)" in source
+    assert "if (reportProgress)" in source
     assert "cancelAutomaticDiscoveryConnect" in source
     connection_busy = re.search(
         r"void VixenWirelessUnit::setAutomaticConnectionBusy\(.*?\n\}",
@@ -97,7 +101,7 @@ def test_automatic_discovery_retries_without_blocking_the_driver():
     assert 'setConnected(false, IPS_BUSY, "Starting automatic' not in source
     assert 'setConnected(false, IPS_BUSY, "Wireless Unit was not found' not in source
     assert "discoverWirelessUnit(false) == DiscoveryResult::found" in source
-    assert "unsigned maximumAttempts = 1" in header
+    assert "unsigned maximumAttempts = 1, bool reportProgress = true" in header
     assert "Run Search again before connecting" not in source
     endpoint_update = re.search(
         r"const bool endpointChanged =.*?if \(endpointChanged\).*?"

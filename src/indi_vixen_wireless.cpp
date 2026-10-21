@@ -32,8 +32,12 @@ namespace
 constexpr double kMinimumWirelessFirmware = 1.39;
 constexpr std::uint32_t kMountStatusPollingMilliseconds =
     vixen::wirelessunit::motion_timing::statusPollingMilliseconds;
-constexpr unsigned kAutomaticDiscoveryMaximumAttempts = 4;
 constexpr int kAutomaticDiscoveryRetryMilliseconds = 5000;
+constexpr unsigned kAutomaticDiscoveryInitialReportedAttempts = 4;
+constexpr int kAutomaticDiscoverySteadyReportMilliseconds = 30000;
+static_assert(kAutomaticDiscoverySteadyReportMilliseconds % kAutomaticDiscoveryRetryMilliseconds == 0);
+constexpr unsigned kAutomaticDiscoverySteadyReportAttempts =
+    kAutomaticDiscoverySteadyReportMilliseconds / kAutomaticDiscoveryRetryMilliseconds;
 constexpr int kDefaultSlewRateIndex = 7; // 100x in the ascending rate table.
 constexpr const char *kWifiTab = "Wi-Fi Station";
 constexpr const char *kHotspotTab = "Wi-Fi Access Point";
@@ -1407,7 +1411,7 @@ bool VixenWirelessUnit::ISNewText(const char *dev, const char *name, char *texts
 }
 
 VixenWirelessUnit::DiscoveryResult VixenWirelessUnit::discoverWirelessUnit(
-    bool automatic, unsigned attempt, unsigned maximumAttempts)
+    bool automatic, unsigned attempt, unsigned maximumAttempts, bool reportProgress)
 {
     const bool retryingAutomaticDiscovery =
         automatic && deviceDiscoveryState_ == DeviceDiscoveryState::unavailable;
@@ -1424,15 +1428,20 @@ VixenWirelessUnit::DiscoveryResult VixenWirelessUnit::discoverWirelessUnit(
     }
 
     DiscoverySP.s = IPS_BUSY;
-    if (automatic && maximumAttempts > 1)
-        IDSetSwitch(&DiscoverySP, "Searching for Wireless Unit via UDP (attempt %u/%u)...",
-                    attempt, maximumAttempts);
-    else
-        IDSetSwitch(&DiscoverySP, "%s",
-                    retryingAutomaticDiscovery
-                        ? "The previous search found no usable Wireless Unit; searching again via UDP..."
-                        : automatic ? "No previous scan result; searching local IPv4 networks via UDP..."
-                                    : "Searching local IPv4 networks via UDP...");
+    if (reportProgress)
+    {
+        if (automatic && maximumAttempts == 0)
+            IDSetSwitch(&DiscoverySP, "Searching for Wireless Unit via UDP (attempt %u)...", attempt);
+        else if (automatic && maximumAttempts > 1)
+            IDSetSwitch(&DiscoverySP, "Searching for Wireless Unit via UDP (attempt %u/%u)...",
+                        attempt, maximumAttempts);
+        else
+            IDSetSwitch(&DiscoverySP, "%s",
+                        retryingAutomaticDiscovery
+                            ? "The previous search found no usable Wireless Unit; searching again via UDP..."
+                            : automatic ? "No previous scan result; searching local IPv4 networks via UDP..."
+                                        : "Searching local IPv4 networks via UDP...");
+    }
     std::string error;
     const auto units = vixen::wirelessunit::discoverWirelessUnits(
         { static_cast<std::uint16_t>(parsedPort), std::chrono::milliseconds(800), {} }, error);
@@ -1449,17 +1458,28 @@ VixenWirelessUnit::DiscoveryResult VixenWirelessUnit::discoverWirelessUnit(
     if (units.empty())
     {
         deviceDiscoveryState_ = DeviceDiscoveryState::unavailable;
-        const bool willRetry = automatic && attempt < maximumAttempts;
+        const bool willRetry = automatic && (maximumAttempts == 0 || attempt < maximumAttempts);
         DiscoverySP.s = willRetry ? IPS_BUSY : IPS_ALERT;
-        if (willRetry)
+        if (willRetry && reportProgress)
         {
-            IDSetSwitch(&DiscoverySP,
-                        "No Wireless Unit responded on attempt %u/%u; retrying in %d seconds.",
-                        attempt, maximumAttempts, kAutomaticDiscoveryRetryMilliseconds / 1000);
-            LOGF_WARN("No Wireless Unit responded on UDP port %ld (attempt %u/%u); retrying in %d seconds.",
-                      parsedPort, attempt, maximumAttempts, kAutomaticDiscoveryRetryMilliseconds / 1000);
+            if (maximumAttempts == 0)
+            {
+                IDSetSwitch(&DiscoverySP,
+                            "No Wireless Unit responded on attempt %u; continuing every %d seconds.",
+                            attempt, kAutomaticDiscoveryRetryMilliseconds / 1000);
+                LOGF_WARN("No Wireless Unit responded on UDP port %ld (attempt %u); continuing every %d seconds.",
+                          parsedPort, attempt, kAutomaticDiscoveryRetryMilliseconds / 1000);
+            }
+            else
+            {
+                IDSetSwitch(&DiscoverySP,
+                            "No Wireless Unit responded on attempt %u/%u; retrying in %d seconds.",
+                            attempt, maximumAttempts, kAutomaticDiscoveryRetryMilliseconds / 1000);
+                LOGF_WARN("No Wireless Unit responded on UDP port %ld (attempt %u/%u); retrying in %d seconds.",
+                          parsedPort, attempt, maximumAttempts, kAutomaticDiscoveryRetryMilliseconds / 1000);
+            }
         }
-        else
+        else if (!willRetry)
         {
             IDSetSwitch(&DiscoverySP, "No Wireless Unit responded on UDP port %ld.", parsedPort);
             LOGF_ERROR("No Wireless Unit responded on UDP port %ld. Check the Unit power and local network.",
@@ -1518,8 +1538,12 @@ void VixenWirelessUnit::runAutomaticDiscoveryAttempt()
         return;
 
     ++automaticDiscoveryAttempt_;
+    const bool reportProgress =
+        automaticDiscoveryAttempt_ <= kAutomaticDiscoveryInitialReportedAttempts ||
+        (automaticDiscoveryAttempt_ - kAutomaticDiscoveryInitialReportedAttempts) %
+            kAutomaticDiscoverySteadyReportAttempts == 0;
     const auto result = discoverWirelessUnit(
-        true, automaticDiscoveryAttempt_, kAutomaticDiscoveryMaximumAttempts);
+        true, automaticDiscoveryAttempt_, 0, reportProgress);
     if (!automaticConnectPending_)
         return;
 
@@ -1529,10 +1553,10 @@ void VixenWirelessUnit::runAutomaticDiscoveryAttempt()
         return;
     }
 
-    if (result == DiscoveryResult::noResponse &&
-        automaticDiscoveryAttempt_ < kAutomaticDiscoveryMaximumAttempts)
+    if (result == DiscoveryResult::noResponse)
     {
-        setAutomaticConnectionBusy("Wireless Unit was not found; automatic discovery will retry.");
+        if (reportProgress)
+            setAutomaticConnectionBusy("Wireless Unit was not found; automatic discovery will retry.");
         automaticDiscoveryTimerId_ = IEAddTimer(
             kAutomaticDiscoveryRetryMilliseconds, automaticDiscoveryRetryHelper, this);
         return;
@@ -1542,17 +1566,8 @@ void VixenWirelessUnit::runAutomaticDiscoveryAttempt()
     automaticConnectPending_ = false;
     automaticDiscoveryAttempt_ = 0;
     automaticDiscoveryTimerId_ = 0;
-    if (result == DiscoveryResult::noResponse)
-    {
-        setConnected(false, IPS_ALERT,
-                     "No Wireless Unit was found after 4 automatic discovery attempts.");
-        LOGF_ERROR("Connection stopped after %u automatic Device discovery attempts.", completedAttempts);
-    }
-    else
-    {
-        setConnected(false, IPS_ALERT, "Automatic Wireless Unit discovery failed.");
-        LOG_ERROR("Connection stopped because automatic Device discovery failed.");
-    }
+    setConnected(false, IPS_ALERT, "Automatic Wireless Unit discovery failed.");
+    LOGF_ERROR("Connection stopped because automatic Device discovery failed on attempt %u.", completedAttempts);
 }
 
 void VixenWirelessUnit::finishAutomaticDiscoveryConnect()

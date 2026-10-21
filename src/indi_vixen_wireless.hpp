@@ -81,7 +81,8 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
             transportError
         };
 
-        DiscoveryResult discoverWirelessUnit(bool automatic, unsigned attempt = 1, unsigned maximumAttempts = 1);
+        DiscoveryResult discoverWirelessUnit(bool automatic, unsigned attempt = 1,
+                                             unsigned maximumAttempts = 1, bool reportProgress = true);
         void startAutomaticDiscoveryConnect();
         void runAutomaticDiscoveryAttempt();
         void finishAutomaticDiscoveryConnect();

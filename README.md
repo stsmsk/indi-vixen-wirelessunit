@@ -7,7 +7,7 @@ Wireless Unit firmware 2.60, Raspberry Pi OS Trixie, and INDI 2.2.3.1
 
 ## Features
 
-- UDP discovery and connection to the Wireless Unit
+- UDP discovery and connection to the Wireless Unit, retrying every five seconds until cancelled
 - equatorial coordinates, GoTo, Sync, tracking, Park, and Unpark
 - manual N/S/E/W motion with `0.5x`, `1x`, `2x`, `4x`, `10x`, `20x`,
   `40x`, `100x`, `200x`, and `400x` rates

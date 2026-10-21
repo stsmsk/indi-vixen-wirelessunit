@@ -29,8 +29,9 @@ or by an INDI client such as KStars/Ekos, rather than run directly.
 The default Wireless Unit command port is UDP port 60023.
 The Connection tab can discover a unit on local IPv4 networks or use a Host
 and Port entered by the operator.
-Automatic discovery attempts up to four searches at five-second intervals
-when no unit responds. Disconnect cancels pending searches.
+Automatic discovery continues at five-second intervals until a unit responds
+or Disconnect cancels the search. Progress is reported for the first four
+attempts and every thirty seconds thereafter to limit log growth.
 Manual Search performs one search.
 An operator-edited endpoint is contacted directly without automatic discovery.
 .SH FILES
