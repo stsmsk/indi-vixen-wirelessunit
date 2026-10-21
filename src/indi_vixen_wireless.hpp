@@ -68,7 +68,6 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
         {
             notScanned,
             found,
-            manualEndpoint,
             unavailable
         };
 
@@ -90,6 +89,9 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
         void setAutomaticConnectionBusy(const char *message);
         static void automaticDiscoveryRetryHelper(void *context);
         void automaticDiscoveryRetry();
+        bool automaticDiscoverySelected() const;
+        bool manualIpSelected() const;
+        void selectConnectionMode(bool automatic);
         bool sendContinuousMotion();
         bool manualMotionActive() const;
         bool guidePulseActive() const;
@@ -130,6 +132,8 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
         void cancelGuideTimers();
         void updateFirmwareProperties(double wirelessVersion, const vixen::wirelessunit::MountIdentity &identity);
 
+        ISwitch ConnectionModeS[2] {};
+        ISwitchVectorProperty ConnectionModeSP {};
         IText EndpointT[2] {};
         ITextVectorProperty EndpointTP {};
         ISwitch TransportS[2] {};
@@ -221,6 +225,7 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
         int guideNSTimerId_ { 0 };
         int guideWETimerId_ { 0 };
         bool trackingKnownStopped_ { false };
+        bool connectionModeConfigLoaded_ { false };
         bool endpointConfigLoaded_ { false };
         bool assumeHomeConfigLoaded_ { false };
         bool connectionUsesDeviceSettings_ { true };

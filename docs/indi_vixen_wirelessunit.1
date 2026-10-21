@@ -27,13 +27,15 @@ It is normally started by
 or by an INDI client such as KStars/Ekos, rather than run directly.
 .SH NETWORK
 The default Wireless Unit command port is UDP port 60023.
-The Connection tab can discover a unit on local IPv4 networks or use a Host
-and Port entered by the operator.
+The Connection tab provides an Automatic discovery mode for local IPv4
+networks and a persistent Manual IP mode for a Host and Port entered by the
+operator. Manual IP is suitable for a routed Wireless Unit on another subnet.
 Automatic discovery continues at five-second intervals until a unit responds
 or Disconnect cancels the search. Progress is reported for the first four
 attempts and every thirty seconds thereafter to limit log growth.
 Manual Search performs one search.
-An operator-edited endpoint is contacted directly without automatic discovery.
+Only selecting Manual IP causes the configured endpoint to be contacted
+directly. Saving or editing a Host does not implicitly enable Manual IP.
 .SH FILES
 .TP
 .I /usr/share/indi/indi_vixen_wirelessunit.xml

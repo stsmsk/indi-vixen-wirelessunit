@@ -143,17 +143,31 @@ def connect_server(port: int, process: subprocess.Popen) -> socket.socket:
 def exercise(peer: IndiPeer, expected_version: str) -> None:
     peer.send(f'<getProperties version="1.7" device="{DEVICE}"/>')
     discovery = peer.wait_vector("defSwitchVector", "WIRELESS_DISCOVERY")
+    connection_mode = peer.wait_vector("defSwitchVector", "WIRELESS_CONNECTION_MODE")
     endpoint = peer.wait_vector("defTextVector", "WIRELESS_ENDPOINT")
     assert element_value(discovery, "SEARCH") == "Off"
+    assert element_value(connection_mode, "AUTO_DISCOVERY") == "On"
+    assert element_value(connection_mode, "MANUAL_IP") == "Off"
     discovery_start = re.search(rb"<defSwitchVector\b[^>]*WIRELESS_DISCOVERY", peer.buffer)
+    mode_start = re.search(rb"<defSwitchVector\b[^>]*WIRELESS_CONNECTION_MODE", peer.buffer)
     endpoint_start = re.search(rb"<defTextVector\b[^>]*WIRELESS_ENDPOINT", peer.buffer)
-    assert discovery_start and endpoint_start and discovery_start.start() < endpoint_start.start()
+    assert discovery_start and mode_start and endpoint_start
+    assert discovery_start.start() < mode_start.start() < endpoint_start.start()
     assert endpoint.attrib.get("device") == DEVICE
     peer.wait_vector("defSwitchVector", "SIMULATION")
     peer.wait_vector("defSwitchVector", "WIRELESS_SETTINGS_SOURCE")
     peer.wait_vector("defSwitchVector", "CONNECTION")
     driver_build = peer.wait_vector("defTextVector", "DRIVER_BUILD")
     assert element_value(driver_build, "DRIVER_VERSION") == expected_version
+
+    start = peer.send(switch_xml(
+        "WIRELESS_CONNECTION_MODE", {"AUTO_DISCOVERY": "Off", "MANUAL_IP": "On"},
+    ))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_CONNECTION_MODE", start,
+        lambda vector: vector.attrib.get("state") == "Ok" and
+                       element_value(vector, "MANUAL_IP") == "On",
+    )
 
     start = peer.send(switch_xml("SIMULATION", {"ENABLE": "On", "DISABLE": "Off"}))
     peer.wait_vector(

@@ -107,6 +107,12 @@ bool VixenWirelessUnit::initProperties()
     MovementWESP.fill(getDeviceName(), "TELESCOPE_MOTION_WE", "Motion W/E", MAIN_CONTROL_TAB,
                       IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
 
+    IUFillSwitch(&ConnectionModeS[0], "AUTO_DISCOVERY", "Automatic discovery", ISS_ON);
+    IUFillSwitch(&ConnectionModeS[1], "MANUAL_IP", "Manual IP", ISS_OFF);
+    IUFillSwitchVector(&ConnectionModeSP, ConnectionModeS, 2, getDeviceName(),
+                       "WIRELESS_CONNECTION_MODE", "Connection mode", CONNECTION_TAB,
+                       IP_RW, ISR_1OFMANY, 60, IPS_IDLE);
+
     IUFillText(&EndpointT[0], "HOST", "Host", vixen::wirelessunit::kUdpDefaultHost.data());
     IUFillText(&EndpointT[1], "PORT", "Port", "60023");
     IUFillTextVector(&EndpointTP, EndpointT, 2, getDeviceName(), "WIRELESS_ENDPOINT", "Wireless Unit",
@@ -340,12 +346,18 @@ void VixenWirelessUnit::ISGetProperties(const char *dev)
     // Advertise discovery before this driver's endpoint property. The
     // standard Telescope connection vectors have already been advertised.
     defineProperty(&DiscoverySP);
+    defineProperty(&ConnectionModeSP);
     defineProperty(&EndpointTP);
     defineProperty(&DriverBuildTP);
     // The endpoint is required before Connect, whereas Ekos normally requests
     // a complete CONFIG_LOAD only after a connection succeeds. Load this one
     // property once when it is first exposed so a saved Host/Port can actually
     // be used to establish the next connection.
+    if (!connectionModeConfigLoaded_)
+    {
+        loadConfig(true, ConnectionModeSP.name);
+        connectionModeConfigLoaded_ = true;
+    }
     if (!endpointConfigLoaded_)
     {
         loadConfig(true, EndpointTP.name);
@@ -1393,16 +1405,19 @@ bool VixenWirelessUnit::ISNewText(const char *dev, const char *name, char *texts
         if (endpointChanged)
         {
             const bool configurationReplay = loadingEndpointConfig_ || isConfigLoading() || loadingDefaults_;
-            deviceDiscoveryState_ = configurationReplay ? DeviceDiscoveryState::notScanned
-                                                        : DeviceDiscoveryState::manualEndpoint;
-            if (!configurationReplay)
+            if (!configurationReplay && automaticConnectPending_)
                 cancelAutomaticDiscoveryConnect(
                     "Automatic discovery cancelled because the endpoint was changed.");
+            if (automaticDiscoverySelected())
+                deviceDiscoveryState_ = DeviceDiscoveryState::notScanned;
         }
         EndpointTP.s = IPS_OK;
-        if (endpointChanged && deviceDiscoveryState_ == DeviceDiscoveryState::manualEndpoint)
+        if (endpointChanged && manualIpSelected())
             IDSetText(&EndpointTP, "%s",
-                      "Manual endpoint selected; Connect will use it without Device discovery.");
+                      "Manual IP will use this Host and Port without Device discovery.");
+        else if (endpointChanged)
+            IDSetText(&EndpointTP, "%s",
+                      "Endpoint saved; Automatic discovery will determine the Host when connecting.");
         else
             IDSetText(&EndpointTP, nullptr);
         return true;
@@ -1636,10 +1651,67 @@ void VixenWirelessUnit::automaticDiscoveryRetry()
     runAutomaticDiscoveryAttempt();
 }
 
+bool VixenWirelessUnit::automaticDiscoverySelected() const
+{
+    return ConnectionModeS[0].s == ISS_ON;
+}
+
+bool VixenWirelessUnit::manualIpSelected() const
+{
+    return ConnectionModeS[1].s == ISS_ON;
+}
+
+void VixenWirelessUnit::selectConnectionMode(bool automatic)
+{
+    IUResetSwitch(&ConnectionModeSP);
+    ConnectionModeS[automatic ? 0 : 1].s = ISS_ON;
+}
+
 bool VixenWirelessUnit::ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n)
 {
     if (!dev || std::strcmp(dev, getDeviceName()) != 0)
         return INDI::Telescope::ISNewSwitch(dev, name, states, names, n);
+
+    if (std::strcmp(name, ConnectionModeSP.name) == 0)
+    {
+        const char *requested = IUFindOnSwitchName(states, names, n);
+        if (!requested || (std::strcmp(requested, "AUTO_DISCOVERY") != 0 &&
+                           std::strcmp(requested, "MANUAL_IP") != 0))
+        {
+            ConnectionModeSP.s = IPS_ALERT;
+            IDSetSwitch(&ConnectionModeSP, "Select Automatic discovery or Manual IP.");
+            return false;
+        }
+
+        const bool requestedAutomatic = std::strcmp(requested, "AUTO_DISCOVERY") == 0;
+        const bool requestedManual = !requestedAutomatic;
+        if (isConnected())
+        {
+            const bool unchanged = (requestedAutomatic && automaticDiscoverySelected()) ||
+                                   (requestedManual && manualIpSelected());
+            if (unchanged)
+            {
+                ConnectionModeSP.s = IPS_OK;
+                IDSetSwitch(&ConnectionModeSP, nullptr);
+                return true;
+            }
+            ConnectionModeSP.s = IPS_ALERT;
+            IDSetSwitch(&ConnectionModeSP, "Disconnect before changing the connection mode.");
+            return false;
+        }
+
+        if (automaticConnectPending_)
+            cancelAutomaticDiscoveryConnect("Automatic discovery cancelled because the connection mode was changed.");
+        selectConnectionMode(requestedAutomatic);
+        if (requestedAutomatic)
+            deviceDiscoveryState_ = DeviceDiscoveryState::notScanned;
+        ConnectionModeSP.s = IPS_OK;
+        IDSetSwitch(&ConnectionModeSP, "%s",
+                    requestedAutomatic
+                        ? "Connect will discover a Wireless Unit on a local IPv4 network."
+                        : "Connect will use the configured Host and Port without Device discovery.");
+        return true;
+    }
 
     if (std::strcmp(name, "CONNECTION") == 0)
     {
@@ -1650,7 +1722,8 @@ bool VixenWirelessUnit::ISNewSwitch(const char *dev, const char *name, ISState *
             updateProperties();
             return true;
         }
-        if (requested && std::strcmp(requested, "CONNECT") == 0 && !isConnected() && !isSimulation())
+        if (requested && std::strcmp(requested, "CONNECT") == 0 && !isConnected() && !isSimulation() &&
+                automaticDiscoverySelected())
         {
             if (automaticConnectPending_)
             {
@@ -2648,6 +2721,7 @@ bool VixenWirelessUnit::ISNewNumber(const char *dev, const char *name, double va
 bool VixenWirelessUnit::saveConfigItems(FILE *fp)
 {
     INDI::Telescope::saveConfigItems(fp);
+    IUSaveConfigSwitch(fp, &ConnectionModeSP);
     IUSaveConfigText(fp, &EndpointTP);
     IUSaveConfigSwitch(fp, &AssumeHomeSP);
     IUSaveConfigSwitch(fp, &UseDeviceSettingsSP);
@@ -2763,6 +2837,10 @@ bool VixenWirelessUnit::loadDefaultConfig()
 
     if (!isConnected())
     {
+        selectConnectionMode(true);
+        ConnectionModeSP.s = IPS_IDLE;
+        deviceDiscoveryState_ = DeviceDiscoveryState::notScanned;
+        IDSetSwitch(&ConnectionModeSP, "Connection mode restored to Automatic discovery.");
         AssumeHomeS[0].s = ISS_OFF;
         AssumeHomeSP.s = IPS_IDLE;
         IDSetSwitch(&AssumeHomeSP, "Automatic HOME initialization restored to Off.");
@@ -2907,23 +2985,35 @@ bool VixenWirelessUnit::Connect()
     }
     else
     {
-        const bool discoveryRequired = deviceDiscoveryState_ == DeviceDiscoveryState::notScanned ||
-                                       deviceDiscoveryState_ == DeviceDiscoveryState::unavailable;
-        if (discoveryRequired && discoverWirelessUnit(true) != DiscoveryResult::found)
+        if (automaticDiscoverySelected())
         {
-            LOG_ERROR("Connection stopped because automatic Device discovery did not find exactly one Wireless Unit.");
-            return false;
+            const bool discoveryRequired = deviceDiscoveryState_ == DeviceDiscoveryState::notScanned ||
+                                           deviceDiscoveryState_ == DeviceDiscoveryState::unavailable;
+            if (discoveryRequired && discoverWirelessUnit(true) != DiscoveryResult::found)
+            {
+                LOG_ERROR("Connection stopped because automatic Device discovery did not find exactly one Wireless Unit.");
+                return false;
+            }
         }
-        if (deviceDiscoveryState_ == DeviceDiscoveryState::manualEndpoint)
+        else if (manualIpSelected())
             LOGF_INFO("Using manually selected Wireless Unit endpoint %s:%s without Device discovery.",
                       EndpointT[0].text, EndpointT[1].text);
+        else
+        {
+            ConnectionModeSP.s = IPS_ALERT;
+            IDSetSwitch(&ConnectionModeSP, "Select Automatic discovery or Manual IP before connecting.");
+            LOG_ERROR("Connection stopped because no connection mode is selected.");
+            return false;
+        }
 
         if (std::strcmp(EndpointT[0].text, vixen::wirelessunit::kUdpDefaultHost.data()) == 0)
         {
             EndpointTP.s = IPS_ALERT;
-            IDSetText(&EndpointTP,
-                      "Device discovery completed without a usable Wireless Unit IP address.");
-            LOG_ERROR("Device discovery completed without a usable Wireless Unit IP address.");
+            const char *message = manualIpSelected()
+                                      ? "Manual IP requires a specific Wireless Unit Host address."
+                                      : "Device discovery completed without a usable Wireless Unit IP address.";
+            IDSetText(&EndpointTP, "%s", message);
+            LOGF_ERROR("%s", message);
             return false;
         }
 

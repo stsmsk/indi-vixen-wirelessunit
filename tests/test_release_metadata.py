@@ -103,15 +103,30 @@ def test_automatic_discovery_retries_without_blocking_the_driver():
     assert "discoverWirelessUnit(false) == DiscoveryResult::found" in source
     assert "unsigned maximumAttempts = 1, bool reportProgress = true" in header
     assert "Run Search again before connecting" not in source
-    endpoint_update = re.search(
-        r"const bool endpointChanged =.*?if \(endpointChanged\).*?"
-        r"DeviceDiscoveryState::manualEndpoint;",
-        source,
-        re.DOTALL,
-    )
-    assert endpoint_update is not None
     assert "loadingEndpointConfig_ || isConfigLoading() || loadingDefaults_" in source
     assert "Using manually selected Wireless Unit endpoint" in source
+
+
+def test_connection_mode_persists_manual_ip_and_controls_discovery():
+    source = (ROOT / "src/indi_vixen_wireless.cpp").read_text(encoding="utf-8")
+    header = (ROOT / "src/indi_vixen_wireless.hpp").read_text(encoding="utf-8")
+    assert '"WIRELESS_CONNECTION_MODE", "Connection mode"' in source
+    assert '"AUTO_DISCOVERY", "Automatic discovery", ISS_ON' in source
+    assert '"MANUAL_IP", "Manual IP", ISS_OFF' in source
+    assert "IUSaveConfigSwitch(fp, &ConnectionModeSP);" in source
+    assert "loadConfig(true, ConnectionModeSP.name);" in source
+    assert "bool automaticDiscoverySelected() const;" in header
+    assert "bool manualIpSelected() const;" in header
+    assert "automaticDiscoverySelected())" in source
+    assert "else if (manualIpSelected())" in source
+    assert "Connect will use the configured Host and Port without Device discovery." in source
+    assert "Manual IP requires a specific Wireless Unit Host address." in source
+    assert "DeviceDiscoveryState::manualEndpoint" not in source
+    assert "selectConnectionMode(false);" not in source
+    assert "Manual IP selected because the endpoint was changed." not in source
+    assert "if (automaticDiscoverySelected())" in source
+    assert "if (endpointChanged && manualIpSelected())" in source
+    assert "Select Automatic discovery or Manual IP before connecting." in source
 
 
 def test_automatic_home_is_opt_in_safe_and_uses_shared_initialization():
