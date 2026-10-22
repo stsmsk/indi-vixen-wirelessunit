@@ -343,6 +343,22 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
         lambda vector: vector.attrib.get("state") == "Idle" and
                        element_value(vector, "DISCONNECT") == "On",
     )
+
+    # Default must restore the complete disconnected connection policy. A
+    # saved or .default endpoint must not survive as the visible default.
+    start = peer.send(switch_xml("CONFIG_PROCESS", {"CONFIG_DEFAULT": "On"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_CONNECTION_MODE", start,
+        lambda vector: vector.attrib.get("state") == "Idle" and
+                       element_value(vector, "AUTO_DISCOVERY") == "On" and
+                       element_value(vector, "MANUAL_IP") == "Off",
+    )
+    peer.wait_vector(
+        "setTextVector", "WIRELESS_ENDPOINT", start,
+        lambda vector: vector.attrib.get("state") == "Idle" and
+                       element_value(vector, "HOST") == "0.0.0.0" and
+                       element_value(vector, "PORT") == "60023",
+    )
     print("PASS: driver XML Simulation settings, alignment deletion, reconnect, HOME, and disconnect")
 
 

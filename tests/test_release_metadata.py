@@ -127,6 +127,9 @@ def test_connection_mode_persists_manual_ip_and_controls_discovery():
     assert "if (automaticDiscoverySelected())" in source
     assert "if (endpointChanged && manualIpSelected())" in source
     assert "Select Automatic discovery or Manual IP before connecting." in source
+    assert "IUSaveText(&EndpointT[0], vixen::wirelessunit::kUdpDefaultHost.data());" in source
+    assert "std::to_string(vixen::wirelessunit::kUdpDefaultPort)" in source
+    assert "Wireless Unit endpoint restored to 0.0.0.0:60023." in source
 
 
 def test_automatic_home_is_opt_in_safe_and_uses_shared_initialization():

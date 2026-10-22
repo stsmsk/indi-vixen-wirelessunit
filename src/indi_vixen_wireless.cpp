@@ -2841,6 +2841,13 @@ bool VixenWirelessUnit::loadDefaultConfig()
         ConnectionModeSP.s = IPS_IDLE;
         deviceDiscoveryState_ = DeviceDiscoveryState::notScanned;
         IDSetSwitch(&ConnectionModeSP, "Connection mode restored to Automatic discovery.");
+
+        const std::string defaultPort = std::to_string(vixen::wirelessunit::kUdpDefaultPort);
+        IUSaveText(&EndpointT[0], vixen::wirelessunit::kUdpDefaultHost.data());
+        IUSaveText(&EndpointT[1], defaultPort.c_str());
+        EndpointTP.s = IPS_IDLE;
+        IDSetText(&EndpointTP, "Wireless Unit endpoint restored to 0.0.0.0:60023.");
+
         AssumeHomeS[0].s = ISS_OFF;
         AssumeHomeSP.s = IPS_IDLE;
         IDSetSwitch(&AssumeHomeSP, "Automatic HOME initialization restored to Off.");
