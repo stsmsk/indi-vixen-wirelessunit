@@ -4,7 +4,7 @@
 # See COPYING for the full license text.
 
 cmake_minimum_required(VERSION 3.16)
-project(indi_vixen_wireless VERSION 0.1.137 LANGUAGES CXX)
+project(indi_vixen_wireless VERSION 0.1.138 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 

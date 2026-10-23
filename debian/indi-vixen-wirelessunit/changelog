@@ -1,3 +1,11 @@
+indi-vixen-wirelessunit (0.1.138-1) trixie; urgency=medium
+
+  * Add persistent Automatic discovery and Manual IP connection modes.
+  * Restore Automatic discovery and 0.0.0.0:60023 when loading defaults.
+  * Add local and remote Raspberry Pi deployment and log-capture workflows.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Fri, 23 Oct 2026 22:37:59 +0900
+
 indi-vixen-wirelessunit (0.1.137-1) trixie; urgency=medium
 
   * Stop active GoTo, tracking, manual motion, and guiding before disconnect.
