@@ -156,6 +156,7 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
     assert endpoint.attrib.get("device") == DEVICE
     peer.wait_vector("defSwitchVector", "SIMULATION")
     peer.wait_vector("defSwitchVector", "WIRELESS_SETTINGS_SOURCE")
+    peer.wait_vector("defSwitchVector", "WIRELESS_ASSUME_HOME")
     peer.wait_vector("defSwitchVector", "CONNECTION")
     driver_build = peer.wait_vector("defTextVector", "DRIVER_BUILD")
     assert element_value(driver_build, "DRIVER_VERSION") == expected_version
@@ -178,6 +179,13 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
     peer.wait_vector(
         "setSwitchVector", "WIRELESS_SETTINGS_SOURCE", start,
         lambda vector: element_value(vector, "USE_DEVICE_SETTINGS") == "Off",
+    )
+    # A user's saved configuration may enable automatic HOME initialization.
+    # Keep this test deterministic and exercise the explicit Home set path.
+    start = peer.send(switch_xml("WIRELESS_ASSUME_HOME", {"ON_CONNECT": "Off"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_ASSUME_HOME", start,
+        lambda vector: element_value(vector, "ON_CONNECT") == "Off",
     )
     # Offline Set accepts a future mount setting but must not claim that the
     # Wireless Unit has applied it. Local policy/slew-rate switches differ.
