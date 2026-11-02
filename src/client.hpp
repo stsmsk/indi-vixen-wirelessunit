@@ -78,7 +78,8 @@ class ProtocolClient
         Result<void> setWifiHotspotPasswordValue(std::string_view password);
         Result<void> setWifiHotspotChannelValue(int channel);
 
-        Result<void> slewRaDec(double rightAscensionHours, double declinationDegrees);
+        Result<void> slewRaDec(double rightAscensionHours, double declinationDegrees,
+                               TargetObjectType targetType = TargetObjectType::Sidereal);
         Result<void> slewAltAz(double azimuthDegrees, double altitudeDegrees);
         Result<void> home();
         // true: initialized now; false: Wireless Unit returned NG because this
@@ -102,7 +103,8 @@ class ProtocolClient
         Result<void> setMeridianSettings(int forcedTrackingStopDegrees, int automaticGotoDegrees);
         Result<void> setSite(double longitudeDegrees, double latitudeDegrees, float timezoneHours);
         Result<void> setTime(std::chrono::system_clock::time_point utc);
-        Result<void> startTrackingAt(double currentRightAscensionHours, double currentDeclinationDegrees);
+        Result<void> startTrackingAt(double currentRightAscensionHours, double currentDeclinationDegrees,
+                                     TargetObjectType targetType = TargetObjectType::Sidereal);
         Result<void> stopTracking();
 
         const std::optional<MountStatus> &lastMountStatus() const noexcept;

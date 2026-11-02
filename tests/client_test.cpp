@@ -323,6 +323,7 @@ int main()
     assert(client.moveBeforeInitialization(1.0, 100.0, -30.0));
 
     assert(client.slewRaDec(6.0, 30.0));
+    assert(!client.slewRaDec(6.0, 30.0, vixen::wirelessunit::TargetObjectType::AltAz));
     assert(client.home());
     assert(client.abortMotion());
     const auto belowHorizon = client.slewRaDec(18.0, -80.0);

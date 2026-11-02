@@ -320,11 +320,14 @@ TransportResult SimulatorTransport::transact(std::string_view request, std::chro
 
     double first = 0;
     double second = 0;
-    if (request.rfind("$MTTGT=3,", 0) == 0)
+    int targetObjectType = 0;
+    if (std::sscanf(std::string(request).c_str(), "$MTTGT=%d,", &targetObjectType) == 1 &&
+        targetObjectType >= static_cast<int>(TargetObjectType::Sidereal) &&
+        targetObjectType <= static_cast<int>(TargetObjectType::Pluto))
     {
         const auto parsed = parseResponse(request);
         if (!parsed || parsed->fields.size() != 4 || parsed->fields[3].empty() ||
-            std::sscanf(std::string(request).c_str(), "$MTTGT=3,%lf,%lf,", &first, &second) != 2 ||
+            std::sscanf(std::string(request).c_str(), "$MTTGT=%*d,%lf,%lf,", &first, &second) != 2 ||
             !std::isfinite(first) || !std::isfinite(second))
             return { true, "$MTTGT=NG\r\n", {} };
         slewAxis_ = SlewAxis::raDec;
@@ -333,7 +336,7 @@ TransportResult SimulatorTransport::transact(std::string_view request, std::chro
         slewStartSecond_ = declination_;
         slewTargetFirst_ = first;
         slewTargetSecond_ = second;
-        slewTargetObjectType_ = 3;
+        slewTargetObjectType_ = targetObjectType;
         targetLabel_ = parsed->fields[3];
         mountStatus_ = 2;
         return { true, "$MTTGT=OK\r\n", {} };

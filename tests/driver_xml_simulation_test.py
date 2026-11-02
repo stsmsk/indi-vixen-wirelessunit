@@ -34,7 +34,10 @@ def find_vectors(data: bytes, tag: str, name: str) -> list[ET.Element]:
     for match in VECTOR.finditer(data):
         if match.group("tag").decode("ascii") != tag:
             continue
-        vector = ET.fromstring(match.group())
+        try:
+            vector = ET.fromstring(match.group())
+        except ET.ParseError as error:
+            raise AssertionError(f"invalid INDI vector XML: {match.group()!r}") from error
         if vector.attrib.get("device") == DEVICE and vector.attrib.get("name") == name:
             found.append(vector)
     return found
@@ -95,8 +98,10 @@ class IndiPeer:
         except TimeoutError as error:
             observed = find_vectors(bytes(self.buffer[start:]), tag, name)
             states = [vector.attrib.get("state", "<missing>") for vector in observed]
+            messages = [vector.attrib.get("message", "") for vector in observed]
             raise TimeoutError(
-                f"INDI XML {name} response did not match; observed {tag} states: {states}"
+                f"INDI XML {name} response did not match; observed {tag} "
+                f"states: {states}; messages: {messages}"
             ) from error
 
 
@@ -123,9 +128,19 @@ def number_xml(name: str, values: dict[str, str]) -> str:
 
 
 def free_loopback_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind(("127.0.0.1", 0))
-        return listener.getsockname()[1]
+    # Avoid the OS ephemeral range: on a network-active Raspberry Pi an
+    # automatically allocated port can be reused by a new outbound connection
+    # between closing this probe and starting indiserver.
+    first = 20000 + os.getpid() % 10000
+    for offset in range(10000):
+        port = 20000 + (first - 20000 + offset) % 10000
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            try:
+                listener.bind(("0.0.0.0", port))
+            except OSError:
+                continue
+            return port
+    raise RuntimeError("no free INDI test port was found in 20000-29999")
 
 
 def connect_server(port: int, process: subprocess.Popen) -> socket.socket:
@@ -156,6 +171,10 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
     assert endpoint.attrib.get("device") == DEVICE
     peer.wait_vector("defSwitchVector", "SIMULATION")
     peer.wait_vector("defSwitchVector", "WIRELESS_SETTINGS_SOURCE")
+    planet_target = peer.wait_vector("defSwitchVector", "WIRELESS_PLANET_TARGET")
+    assert element_value(planet_target, "SIDEREAL") == "On"
+    assert element_value(planet_target, "SOLAR") == "Off"
+    assert element_value(planet_target, "LUNAR") == "Off"
     peer.wait_vector("defSwitchVector", "WIRELESS_ASSUME_HOME")
     peer.wait_vector("defSwitchVector", "CONNECTION")
     driver_build = peer.wait_vector("defTextVector", "DRIVER_BUILD")
@@ -296,6 +315,49 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
         lambda vector: vector.attrib.get("state") == "Ok",
     )
     peer.wait_for(lambda data: find_del_property(data, "WIRELESS_SET_HOME_POSITION"), start)
+
+    # Target object changes are safe only while tracking and all motion are
+    # stopped. A rejected change must preserve the active selection.
+    target_start = peer.send(switch_xml("WIRELESS_PLANET_TARGET", {"SOLAR": "On"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_PLANET_TARGET", target_start,
+        lambda vector: vector.attrib.get("state") == "Ok" and
+                       element_value(vector, "SOLAR") == "On",
+    )
+    tracking_start = peer.send(switch_xml(
+        "TELESCOPE_TRACK_STATE", {"TRACK_ON": "On", "TRACK_OFF": "Off"},
+    ))
+    peer.wait_vector(
+        "setSwitchVector", "TELESCOPE_TRACK_STATE", tracking_start,
+        lambda vector: vector.attrib.get("state") in {"Busy", "Ok"} and
+                       element_value(vector, "TRACK_ON") == "On",
+    )
+    blocked_start = peer.send(switch_xml("WIRELESS_PLANET_TARGET", {"MARS": "On"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_PLANET_TARGET", blocked_start,
+        lambda vector: vector.attrib.get("state") == "Alert" and
+                       element_value(vector, "SOLAR") == "On" and
+                       element_value(vector, "MARS") == "Off" and
+                       "Stop tracking and motion" in vector.attrib.get("message", ""),
+    )
+    peer.wait_for(
+        lambda data: b"[ERROR] Stop tracking and motion before changing Target object." in data,
+        blocked_start,
+    )
+    tracking_start = peer.send(switch_xml(
+        "TELESCOPE_TRACK_STATE", {"TRACK_ON": "Off", "TRACK_OFF": "On"},
+    ))
+    peer.wait_vector(
+        "setSwitchVector", "TELESCOPE_TRACK_STATE", tracking_start,
+        lambda vector: element_value(vector, "TRACK_OFF") == "On",
+    )
+    target_start = peer.send(switch_xml("WIRELESS_PLANET_TARGET", {"SIDEREAL": "On"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_PLANET_TARGET", target_start,
+        lambda vector: vector.attrib.get("state") == "Ok" and
+                       element_value(vector, "SIDEREAL") == "On",
+    )
+
     # Disconnecting during Park must not carry SCOPE_PARKING into the next
     # connection. A rejection immediately before that disconnect must also
     # not reappear as a stale red indicator when controls are redefined.
@@ -341,6 +403,24 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
         lambda vector: vector.attrib.get("state") == "Idle" and
                        element_value(vector, "TRACK_OFF") == "On",
     )
+    target_start = peer.send(switch_xml("WIRELESS_PLANET_TARGET", {"SOLAR": "On"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_PLANET_TARGET", target_start,
+        lambda vector: vector.attrib.get("state") == "Ok" and
+                       element_value(vector, "SOLAR") == "On",
+    )
+    planet_start = peer.send(switch_xml("WIRELESS_PLANET_TARGET", {"MARS": "On"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_PLANET_TARGET", planet_start,
+        lambda vector: vector.attrib.get("state") == "Ok" and
+                       element_value(vector, "MARS") == "On",
+    )
+    planet_start = peer.send(switch_xml("WIRELESS_PLANET_TARGET", {"SIDEREAL": "On"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_PLANET_TARGET", planet_start,
+        lambda vector: vector.attrib.get("state") == "Ok" and
+                       element_value(vector, "SIDEREAL") == "On",
+    )
     peer.wait_vector(
         "defNumberVector", "EQUATORIAL_EOD_COORD", start,
         lambda vector: vector.attrib.get("state") != "Busy",
@@ -350,6 +430,15 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
         "setSwitchVector", "CONNECTION", start,
         lambda vector: vector.attrib.get("state") == "Idle" and
                        element_value(vector, "DISCONNECT") == "On",
+    )
+
+    # Target object is deliberately not saved, but an explicit Configuration
+    # Default must restore its documented Sidereal selection.
+    start = peer.send(switch_xml("WIRELESS_PLANET_TARGET", {"MARS": "On"}))
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_PLANET_TARGET", start,
+        lambda vector: vector.attrib.get("state") == "Idle" and
+                       element_value(vector, "MARS") == "On",
     )
 
     # Default must restore the complete disconnected connection policy. A
@@ -366,6 +455,12 @@ def exercise(peer: IndiPeer, expected_version: str) -> None:
         lambda vector: vector.attrib.get("state") == "Idle" and
                        element_value(vector, "HOST") == "0.0.0.0" and
                        element_value(vector, "PORT") == "60023",
+    )
+    peer.wait_vector(
+        "setSwitchVector", "WIRELESS_PLANET_TARGET", start,
+        lambda vector: vector.attrib.get("state") == "Idle" and
+                       element_value(vector, "SIDEREAL") == "On" and
+                       element_value(vector, "MARS") == "Off",
     )
     print("PASS: driver XML Simulation settings, alignment deletion, reconnect, HOME, and disconnect")
 

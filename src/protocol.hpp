@@ -85,6 +85,26 @@ struct Response
     bool accepted { false };
 };
 
+// MTTGT target types observed in STAR BOOK Wireless traffic.  The standard
+// Target types 3 through 13 are selected explicitly through the driver's
+// Vixen-specific Target object property.
+enum class TargetObjectType : int
+{
+    Home = 1,
+    AltAz = 2,
+    Sidereal = 3,
+    Solar = 4,
+    Lunar = 5,
+    Mercury = 6,
+    Venus = 7,
+    Mars = 8,
+    Jupiter = 9,
+    Saturn = 10,
+    Uranus = 11,
+    Neptune = 12,
+    Pluto = 13
+};
+
 // Parses one complete response line. No coordinate or enum semantics are
 // applied here; those require validation against real Wireless Unit responses.
 std::optional<Response> parseResponse(std::string_view wireData);
@@ -182,7 +202,8 @@ std::optional<std::string> decodeWifiHotspotSsid(const Response &response);
 std::optional<std::string> decodeWifiHotspotPassword(const Response &response);
 std::optional<int> decodeWifiHotspotChannel(const Response &response);
 
-std::string gotoRaDec(double rightAscensionHours, double declinationDegrees);
+std::string gotoRaDec(double rightAscensionHours, double declinationDegrees,
+                      TargetObjectType targetType = TargetObjectType::Sidereal);
 std::string gotoAltAz(double azimuthDegrees, double altitudeDegrees);
 std::string gotoHome();
 std::string initializeMountCommand();

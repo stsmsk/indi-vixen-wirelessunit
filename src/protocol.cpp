@@ -133,7 +133,10 @@ std::optional<MountStatus> decodeMountStatus(const Response &response)
         return std::nullopt;
 
     const bool knownStatus = *status >= 1 && *status <= 3;
-    const bool knownTargetType = *targetType >= 1 && *targetType <= 3;
+    // HOME, Alt/Az, sidereal, solar, lunar, and planetary target types have
+    // all been observed in STAR BOOK Wireless traffic.
+    const bool knownTargetType = *targetType >= static_cast<int>(TargetObjectType::Home) &&
+                                 *targetType <= static_cast<int>(TargetObjectType::Pluto);
     const bool validCoordinates = *mjd >= 0.0 &&
                                   *azimuth >= 0.0 && *azimuth <= 360.0 &&
                                   *altitude >= -90.0 && *altitude <= 90.0 &&
@@ -344,9 +347,9 @@ std::optional<int> decodeWifiHotspotChannel(const Response &response)
     return channel;
 }
 
-std::string gotoRaDec(double rightAscensionHours, double declinationDegrees)
+std::string gotoRaDec(double rightAscensionHours, double declinationDegrees, TargetObjectType targetType)
 {
-    return command(query::gotoTargetName, 3, ',', Fixed { rightAscensionHours, 6 }, ',',
+    return command(query::gotoTargetName, static_cast<int>(targetType), ',', Fixed { rightAscensionHours, 6 }, ',',
                    Fixed { declinationDegrees, 6 }, ",INDI");
 }
 

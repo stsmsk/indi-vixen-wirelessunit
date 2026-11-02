@@ -54,6 +54,22 @@ int main()
     assert(status && status.value->status == 1);
     assert(std::abs(status.value->rightAscensionHours - 6.0) < 1e-6);
 
+    assert(client.slewRaDec(7.0, 20.0, vixen::wirelessunit::TargetObjectType::Solar));
+    now += 2s;
+    status = client.mountStatus();
+    assert(status && status.value->status == 1 &&
+           status.value->targetObjectType == static_cast<int>(vixen::wirelessunit::TargetObjectType::Solar));
+    assert(client.slewRaDec(8.0, 25.0, vixen::wirelessunit::TargetObjectType::Lunar));
+    now += 2s;
+    status = client.mountStatus();
+    assert(status && status.value->status == 1 &&
+           status.value->targetObjectType == static_cast<int>(vixen::wirelessunit::TargetObjectType::Lunar));
+    assert(client.slewRaDec(9.0, 15.0, vixen::wirelessunit::TargetObjectType::Mars));
+    now += 2s;
+    status = client.mountStatus();
+    assert(status && status.value->status == 1 &&
+           status.value->targetObjectType == static_cast<int>(vixen::wirelessunit::TargetObjectType::Mars));
+
     assert(client.slewRaDec(12.0, 40.0));
     now += 500ms;
     status = client.mountStatus();

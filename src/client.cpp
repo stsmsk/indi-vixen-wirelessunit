@@ -235,9 +235,12 @@ Result<void> ProtocolClient::setWifiHotspotChannelValue(int channel)
     return command(setWifiHotspotChannel(channel), std::chrono::milliseconds(1500));
 }
 
-Result<void> ProtocolClient::slewRaDec(double rightAscensionHours, double declinationDegrees)
+Result<void> ProtocolClient::slewRaDec(double rightAscensionHours, double declinationDegrees,
+                                       TargetObjectType targetType)
 {
-    return targetCommand(gotoRaDec(rightAscensionHours, declinationDegrees));
+    if (targetType < TargetObjectType::Sidereal || targetType > TargetObjectType::Pluto)
+        return { false, "unsupported RA/Dec tracking target type" };
+    return targetCommand(gotoRaDec(rightAscensionHours, declinationDegrees, targetType));
 }
 
 Result<void> ProtocolClient::slewAltAz(double azimuthDegrees, double altitudeDegrees)
@@ -380,9 +383,10 @@ Result<void> ProtocolClient::setTime(std::chrono::system_clock::time_point utc)
     return command(setUtc(utc));
 }
 
-Result<void> ProtocolClient::startTrackingAt(double currentRightAscensionHours, double currentDeclinationDegrees)
+Result<void> ProtocolClient::startTrackingAt(double currentRightAscensionHours, double currentDeclinationDegrees,
+                                              TargetObjectType targetType)
 {
-    return slewRaDec(currentRightAscensionHours, currentDeclinationDegrees);
+    return slewRaDec(currentRightAscensionHours, currentDeclinationDegrees, targetType);
 }
 
 Result<void> ProtocolClient::stopTracking()

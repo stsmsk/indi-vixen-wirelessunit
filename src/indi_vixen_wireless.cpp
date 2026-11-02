@@ -142,6 +142,21 @@ bool VixenWirelessUnit::initProperties()
     IUFillSwitchVector(&GotoSpeedSP, GotoSpeedS, 5, getDeviceName(), "WIRELESS_GOTO_SPEED", "GoTo speed",
                        MOTION_TAB, IP_RW, ISR_1OFMANY, 60, IPS_IDLE);
 
+    IUFillSwitch(&PlanetTargetS[0], "SIDEREAL", "Sidereal", ISS_ON);
+    IUFillSwitch(&PlanetTargetS[1], "SOLAR", "Solar", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[2], "LUNAR", "Lunar", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[3], "MERCURY", "Mercury", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[4], "VENUS", "Venus", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[5], "MARS", "Mars", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[6], "JUPITER", "Jupiter", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[7], "SATURN", "Saturn", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[8], "URANUS", "Uranus", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[9], "NEPTUNE", "Neptune", ISS_OFF);
+    IUFillSwitch(&PlanetTargetS[10], "PLUTO", "Pluto", ISS_OFF);
+    IUFillSwitchVector(&PlanetTargetSP, PlanetTargetS, 11, getDeviceName(),
+                       "WIRELESS_PLANET_TARGET", "Target object", MOTION_TAB,
+                       IP_RW, ISR_1OFMANY, 60, IPS_IDLE);
+
     IUFillNumber(&HomePositionN[0], "HOME_AZ", "Azimuth", "%.1f", 0, 360, 0, 270);
     IUFillNumber(&HomePositionN[1], "HOME_ALT", "Altitude", "%.1f", -90, 90, 0, 0);
     IUFillNumberVector(&HomePositionNP, HomePositionN, 2, getDeviceName(), "WIRELESS_HOME_POSITION", "Home position",
@@ -377,6 +392,7 @@ void VixenWirelessUnit::ISGetProperties(const char *dev)
     // Telescope::ISGetProperties(). Do not delete/re-advertise it here: some
     // clients remove it permanently after the delete notification.
     defineProperty(&GotoSpeedSP);
+    defineProperty(&PlanetTargetSP);
     defineProperty(&GuideRateNP);
     defineProperty(&BacklashNP);
     defineProperty(&MotorPowerSP);
@@ -1672,6 +1688,45 @@ bool VixenWirelessUnit::ISNewSwitch(const char *dev, const char *name, ISState *
     if (!dev || std::strcmp(dev, getDeviceName()) != 0)
         return INDI::Telescope::ISNewSwitch(dev, name, states, names, n);
 
+    if (std::strcmp(name, PlanetTargetSP.name) == 0)
+    {
+        const char *requested = IUFindOnSwitchName(states, names, n);
+        const int currentIndex = IUFindOnSwitchIndex(&PlanetTargetSP);
+        const bool changesSelection = requested && currentIndex >= 0 &&
+                                      std::strcmp(requested, PlanetTargetS[currentIndex].name) != 0;
+        const bool reportedMotion = status_ && (status_->status == 2 || status_->status == 3);
+        const bool reportedTracking = status_ && status_->status == 1 && status_->targetObjectType >= 3 &&
+                                      !trackingKnownStopped_;
+        const bool activeScopeState = TrackState == SCOPE_SLEWING || TrackState == SCOPE_TRACKING ||
+                                      TrackState == SCOPE_PARKING;
+        if (isConnected() && changesSelection &&
+                (manualMotionActive() || guidePulseActive() || reportedMotion || reportedTracking || activeScopeState))
+        {
+            PlanetTargetSP.s = IPS_ALERT;
+            IDSetSwitch(&PlanetTargetSP, "Stop tracking and motion before changing Target object.");
+            LOG_ERROR("Stop tracking and motion before changing Target object.");
+            return false;
+        }
+
+        IUUpdateSwitch(&PlanetTargetSP, states, names, n);
+        const int selected = IUFindOnSwitchIndex(&PlanetTargetSP);
+        if (selected < 0 || selected >= PlanetTargetSP.nsp)
+        {
+            IUResetSwitch(&PlanetTargetSP);
+            PlanetTargetS[0].s = ISS_ON;
+            PlanetTargetSP.s = IPS_ALERT;
+            IDSetSwitch(&PlanetTargetSP, "Select one target object.");
+            return false;
+        }
+
+        PlanetTargetSP.s = isConnected() ? IPS_OK : IPS_IDLE;
+        IDSetSwitch(&PlanetTargetSP, "%s",
+                    selected <= 2
+                        ? "The selected target type will be used for the next GoTo and Tracking On command."
+                        : "The Wireless Unit will calculate and GoTo the selected planet; KStars coordinates are not used as the destination.");
+        return true;
+    }
+
     if (std::strcmp(name, ConnectionModeSP.name) == 0)
     {
         const char *requested = IUFindOnSwitchName(states, names, n);
@@ -2861,6 +2916,15 @@ bool VixenWirelessUnit::loadDefaultConfig()
     if (isConnected())
         SlewRateSP.apply("Slew rate restored to the 100x default.");
 
+    // Target object is intentionally not persisted, but Configuration Default
+    // must still restore every visible driver setting to its documented
+    // initial value. Keep the selection for ordinary disconnect/reconnect
+    // cycles; only an explicit Default request resets it to Sidereal.
+    IUResetSwitch(&PlanetTargetSP);
+    PlanetTargetS[0].s = ISS_ON;
+    PlanetTargetSP.s = isConnected() ? IPS_OK : IPS_IDLE;
+    IDSetSwitch(&PlanetTargetSP, "Target object restored to Sidereal.");
+
     // Connected local Default must not replace the last confirmed device
     // value before the batch is sent and read back.
     const bool connected = isConnected() && client_;
@@ -3675,7 +3739,7 @@ bool VixenWirelessUnit::Goto(double ra, double dec)
         return false;
     if (!targetMotionStartAllowed("GoTo"))
         return false;
-    const auto result = client_->slewRaDec(ra, dec);
+    const auto result = client_->slewRaDec(ra, dec, effectiveTrackingTargetType());
     if (!result)
     {
         LOGF_ERROR("GoTo failed: %s", result.error.c_str());
@@ -4065,7 +4129,8 @@ bool VixenWirelessUnit::SetTrackEnabled(bool enabled)
             trackingKnownStopped_ = true;
             return requireInitialized("Tracking");
         }
-        result = client_->startTrackingAt(status_->rightAscensionHours, status_->declinationDegrees);
+        result = client_->startTrackingAt(status_->rightAscensionHours, status_->declinationDegrees,
+                                          effectiveTrackingTargetType());
     }
     else
     {
@@ -4087,6 +4152,16 @@ bool VixenWirelessUnit::SetTrackEnabled(bool enabled)
         trackingKnownStopped_ = !enabled;
     }
     return static_cast<bool>(result);
+}
+
+vixen::wirelessunit::TargetObjectType VixenWirelessUnit::effectiveTrackingTargetType() const
+{
+    const int selected = IUFindOnSwitchIndex(&PlanetTargetSP);
+    if (selected < 0 || selected >= PlanetTargetSP.nsp)
+        return vixen::wirelessunit::TargetObjectType::Sidereal;
+
+    // The UI order is identical to MTTGT target types 3 through 13.
+    return static_cast<vixen::wirelessunit::TargetObjectType>(selected + 3);
 }
 
 bool VixenWirelessUnit::updateLocation(double latitude, double longitude, double elevation)

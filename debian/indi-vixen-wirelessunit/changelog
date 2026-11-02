@@ -1,3 +1,12 @@
+indi-vixen-wirelessunit (0.1.139-1) trixie; urgency=medium
+
+  * Add explicit sidereal, solar, lunar, and planetary target selection.
+  * Reject target changes while tracking or mount motion is active.
+  * Recognize Wireless Unit target types through Pluto in mount status.
+  * Add protocol, simulator, client, and INDI integration coverage.
+
+ -- Satoshi Masuko <wakeup1002@gmail.com>  Mon, 02 Nov 2026 14:30:00 +0900
+
 indi-vixen-wirelessunit (0.1.138-1) trixie; urgency=medium
 
   * Add persistent Automatic discovery and Manual IP connection modes.

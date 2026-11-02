@@ -97,6 +97,7 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
         bool guidePulseActive() const;
         bool manualMotionStartAllowed() const;
         bool targetMotionStartAllowed(const char *operation) const;
+        vixen::wirelessunit::TargetObjectType effectiveTrackingTargetType() const;
         vixen::wirelessunit::Result<void> stopMountMotion();
         void reconcileMountStateFromStatus();
         void synchronizeTransientMountProperties();
@@ -144,6 +145,8 @@ class VixenWirelessUnit final : public INDI::Telescope, public INDI::GuiderInter
         ISwitchVectorProperty UseDeviceSettingsSP {};
         ISwitch GotoSpeedS[5] {};
         ISwitchVectorProperty GotoSpeedSP {};
+        ISwitch PlanetTargetS[11] {};
+        ISwitchVectorProperty PlanetTargetSP {};
         INumber HomePositionN[2] {};
         INumberVectorProperty HomePositionNP {};
         ISwitch SetHomePositionS[1] {};

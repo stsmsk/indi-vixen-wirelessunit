@@ -1,7 +1,7 @@
 # INDI Vixen Wireless Unit
 
 Experimental INDI telescope and guider driver for the Vixen Wireless Unit.
-The current release is **0.1.138** and has been developed for an SXP2 mount,
+The current release is **0.1.139** and has been developed for an SXP2 mount,
 Wireless Unit firmware 2.60, Raspberry Pi OS Trixie, and INDI 2.2.3.1
 (public INDI API version 2.2.3).
 
@@ -10,6 +10,7 @@ Wireless Unit firmware 2.60, Raspberry Pi OS Trixie, and INDI 2.2.3.1
 - UDP discovery and connection to the Wireless Unit, retrying every five seconds until cancelled
 - persistent Automatic discovery or Manual IP connection mode for routed networks
 - equatorial coordinates, GoTo, Sync, tracking, Park, and Unpark
+- explicit Wireless Unit target selection for sidereal, solar, lunar, and Mercury through Pluto
 - manual N/S/E/W motion with `0.5x`, `1x`, `2x`, `4x`, `10x`, `20x`,
   `40x`, `100x`, `200x`, and `400x` rates
 - pulse guiding and guide-rate configuration
@@ -25,6 +26,19 @@ The driver controls motorized astronomy equipment. Test with the mount
 unloaded and attended before normal use. Keep cable clearance and mechanical
 limits in view. Do not enable **Assume HOME** unless the mount has first been
 placed physically at azimuth 270 degrees and altitude 0 degrees.
+
+## Target objects
+
+Select the intended object type explicitly in **Motion Control > Target
+object** before GoTo. Sidereal is the default. Solar and Lunar select the
+Wireless Unit's Sun and Moon target modes; Mercury through Pluto select its
+internal planetary target modes. The Wireless Unit calculates the selected
+solar-system object's position, so a planetary selection does not merely
+change the tracking rate and must not be combined with a different object in
+KStars. Target object is the sole source for this selection because KStars
+does not infer Solar or Lunar mode from the object chosen for GoTo. Stop
+tracking and all mount motion before changing Target object; the driver rejects
+changes while tracking, slewing, parking, pulse guiding, or moving manually.
 
 ## Raspberry Pi OS Trixie build
 
@@ -50,7 +64,7 @@ On Raspberry Pi OS Trixie:
 
 ```bash
 ./scripts/build-deb-trixie.sh
-sudo apt install ./build/indi-vixen-wirelessunit_0.1.138-1_arm64.deb
+sudo apt install ./build/indi-vixen-wirelessunit_0.1.139-1_arm64.deb
 ```
 
 ## Raspberry Pi deployment and log capture

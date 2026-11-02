@@ -128,6 +128,15 @@ int main()
 
     assert(vixen::wirelessunit::gotoRaDec(12.5, -20.25) ==
            "$MTTGT=3,12.500000,-20.250000,INDI\r\n");
+    assert(vixen::wirelessunit::gotoRaDec(12.5, -20.25,
+                                         vixen::wirelessunit::TargetObjectType::Solar) ==
+           "$MTTGT=4,12.500000,-20.250000,INDI\r\n");
+    assert(vixen::wirelessunit::gotoRaDec(12.5, -20.25,
+                                         vixen::wirelessunit::TargetObjectType::Lunar) ==
+           "$MTTGT=5,12.500000,-20.250000,INDI\r\n");
+    assert(vixen::wirelessunit::gotoRaDec(12.5, -20.25,
+                                         vixen::wirelessunit::TargetObjectType::Mars) ==
+           "$MTTGT=8,12.500000,-20.250000,INDI\r\n");
     assert(vixen::wirelessunit::gotoAltAz(270.0, 0.0) ==
            "$MTTGT=2,270.000000,0.000000,INDI\r\n");
     assert(vixen::wirelessunit::gotoHome() == "$MTTGT=1,270,0,HOME\r\n");
